@@ -1,15 +1,17 @@
+251110: count 테스트, 라우팅 시도
+
+251111 Goal: Home, Login, Signup 라우팅
+
 251112 Goal: /login 리다이렉트, count 이슈 수정
 
 251113 Goal: 아이디 비밀번호 회원가입창
 
-
+251114 Goal: git 연동, tailwindcss 설치, tailwindcss 활용한 디자인 테스트, 로그인 후 넘어갈 페이지
 
 ----------
 Future log
 ----------
 
-tailwindcss 설치
-Github 연동
 라우팅 깔끔하게 정리
 익명함수, 일반 함수 차이 공부
 회원가입, 로그인 페이지 깔끔히 구현 (나중에 OAuth2 쓸 거 같긴 한데)

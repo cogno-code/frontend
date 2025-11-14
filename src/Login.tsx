@@ -13,7 +13,7 @@ export default function Login() {
             <h1>Login</h1>
             <input placeholder="username"/>
             <input type="password" placeholder="password"></input>
-            <button onClick={() => navigate("/")}>Login</button>
+            <button onClick={() => navigate("/dashboard")}>Login</button>
             <Link to="/signup">Sign up to website</Link>
         </div>
     );

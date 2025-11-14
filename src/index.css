@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/*
+tailwindcss 설치
+
+1. npm install tailwindcss @tailwindcss/vite
+2. vite.config.ts에서 import 후 plugin에 넣기
+3. index.css 파일 만들어서 @import "tailwindcss" 하기 (추후 공통 디자인 요소 이 파일에 넣기)
+4. main.tsx에서 index.css 불러오기
+
+*/

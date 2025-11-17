@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Header from "./components/Header";
 
 function dbg(a: String) {
     console.log(`[DEBUG] ${a}`);
@@ -15,10 +16,12 @@ export default function Home() {
 
     return (
         <div>
-            <h1 className="text-2xl">Home</h1>
+            <Header/>
+            <h1 className="text-2xl">Header</h1>
             <h3>{test}</h3>
             <button onClick={() => setTest((v) => ++v)} className="bg:black">Count</button>
             <button onClick={() => navigate("/login")}>Go to Login page</button>
+            <footer>Copyright 2025</footer>
         </div>
     );
 }

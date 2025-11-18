@@ -14,6 +14,8 @@
 
 251117 Goal: 오늘 공부한 라우팅 적용해보기
 
+251118 Goal: Tailwindcss flex 적용해보기
+
 ----------
 Future log
 ----------

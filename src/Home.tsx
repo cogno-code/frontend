@@ -14,6 +14,11 @@ export default function Home() {
         dbg(`test: ${test}`)
     }, [test]);
 
+    useEffect(() => {
+        const data = fetch("http://localhost:8080/test"); // CORS 문제 해결
+        console.log(data);
+    }, []);
+
     return (
         <div>
             <Header/>

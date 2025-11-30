@@ -225,8 +225,6 @@ const DocsPage: React.FC = () => {
         // 선택된 task가 실제 task일 때만 (전체는 제외)
         if (selectedKey === ALL_KEY) return;
 
-        const taskName = selectedKey;
-
         // cleanup: 컴포넌트 unmount 시 실행
         return () => {
             // TODO: 여기에서 해당 task를 "완료" 상태로 만드는 API 호출을 넣으면 됨.

@@ -1,7 +1,7 @@
 // src/timeline/components/MonthlyPlanner.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { DAY_LABELS, getTodayDateString } from "../../timelineUtils";
 
@@ -36,7 +36,6 @@ export default function MonthlyPlanner({
 
     const firstDayOfMonth = new Date(visibleYear, visibleMonth, 1);
     const startWeekDay = firstDayOfMonth.getDay(); // 0(일)~6(토)
-    const daysInMonth = new Date(visibleYear, visibleMonth + 1, 0).getDate();
 
     const cells: Date[] = [];
     const firstCellDate = new Date(

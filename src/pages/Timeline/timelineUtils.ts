@@ -5,7 +5,10 @@ import type { Task, TaskDefinition } from "./timelineTypes";
 /** ==== 공용 상수 ==== */
 
 // 백엔드 타임라인 API 베이스 URL
-export const API_BASE = "http://localhost:8080/api/timeline";
+export const API_BASE =
+    import.meta.env.DEV
+        ? "http://localhost:8080/api/timeline" // ✅ 개발 환경: 스프링 직접 호출
+        : "/api/timeline";
 
 // 타임라인 시간 범위
 export const DAY_START_HOUR = 0;

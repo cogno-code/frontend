@@ -5,7 +5,8 @@ import Signup from "./Signup";
 import Dashboard from "./pages/Dashboard/Dashboard";
 import Study from "./Study";
 import Memo from "./pages/Memo/Memo";
-import Timeline from "./Timeline";
+import TimelinePage from "./pages/Timeline/Timeline";
+import DocsPage from "./pages/Docs/Docs";
 
 export default function App() {
   return (
@@ -17,7 +18,8 @@ export default function App() {
         <Route path="/dashboard" element={<Dashboard/>}/>
         <Route path="/study" element={<Study/>}/>
         <Route path="/memo" element={<Memo/>}/>
-        <Route path="/timeline" element={<Timeline/>}/>
+        <Route path="/timeline" element={<TimelinePage/>}/>
+        <Route path="/docs" element={<DocsPage/>} />
       </Routes>
     </BrowserRouter>
   );

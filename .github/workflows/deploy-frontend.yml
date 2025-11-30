@@ -1,0 +1,78 @@
+name: Deploy Frontend to EC2
+
+on:
+  push:
+    branches:
+      - master  # 배포 트리거할 브랜치
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 코드 체크아웃
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Node 세팅
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 3. 의존성 설치 & Vite 빌드
+      - name: Install deps & build
+        run: |
+          npm ci
+          npm run build
+
+      # 4. Docker 이미지 빌드
+      - name: Build Docker image (frontend)
+        run: |
+          docker build -t frontend-app:latest .
+
+      # 5. 이미지를 tar 파일로 저장
+      - name: Save Docker image to tar
+        run: |
+          docker save frontend-app:latest -o frontend-app.tar
+
+      # 6. tar 파일 권한 수정 (백엔드 때처럼 권한 문제 방지)
+      - name: Fix permissions for tar file
+        run: |
+          ls -l
+          chmod 644 frontend-app.tar
+          ls -l
+
+      # 7. EC2로 tar 파일 복사 (Org secrets: HOST, USER, SSH_KEY 사용)
+      - name: Copy image to EC2 via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "./frontend-app.tar"
+          target: "/home/ubuntu/frontend/"
+
+      # 8. EC2에서 컨테이너 실행/재기동
+      - name: Run remote deploy commands on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd /home/ubuntu/frontend
+
+            # Docker 이미지 로드
+            docker load -i frontend-app.tar
+
+            # 기존 컨테이너 중지/삭제 (있으면)
+            docker stop frontend-app || true
+            docker rm frontend-app || true
+
+            # 새 컨테이너 실행 (80 포트 바인딩)
+            docker run -d \
+              --name frontend-app \
+              --restart always \
+              -p 80:80 \
+              frontend-app:latest

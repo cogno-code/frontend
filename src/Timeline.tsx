@@ -7,21 +7,25 @@ import {
     FaChevronLeft,
     FaChevronRight,
     FaCheck,
+    FaTrash,
+    FaPen,
 } from "react-icons/fa";
 
-type ChatType = "user" | "system";
-type SystemKind = "taskStart" | "taskEnd" | "info";
+/** ==== 타입 정의 ==== */
+
+type ChatType = "USER" | "SYSTEM";
+type SystemKind = "TASK_START" | "TASK_END" | "INFO" | undefined | null;
+type TaskStatus = "RUNNING" | "FINISHED";
 
 type ChatEntry = {
     id: number;
     time: string;
+    createdAt: Date;
     text: string;
     type: ChatType;
     taskName?: string;
     systemKind?: SystemKind;
 };
-
-type TaskStatus = "running" | "paused" | "finished";
 
 type TaskSegment = {
     start: Date;
@@ -40,7 +44,52 @@ type TaskDefinition = {
     color: string;
 };
 
-// 0시 ~ 24시
+/** ==== 백엔드 DTO ==== */
+
+type ApiTaskSegment = {
+    id: number | null;
+    startTime: string;
+    endTime: string | null;
+};
+
+type ApiTask = {
+    id: number | null;
+    name: string;
+    color: string;
+    status: TaskStatus;
+    date: string;
+    segments: ApiTaskSegment[];
+};
+
+type ApiChatEntry = {
+    id: number;
+    createdAt: string;
+    text: string;
+    type: ChatType;
+    taskName: string | null;
+    systemKind: SystemKind;
+};
+
+type ApiTimelineResponse = {
+    date: string;
+    tasks: ApiTask[];
+    entries: ApiChatEntry[];
+};
+
+type ApiChatCreateRequest = {
+    date: string;
+    text: string;
+    type: ChatType;
+    taskName: string | null;
+    systemKind: SystemKind | null;
+};
+
+type ApiChatUpdateRequest = {
+    text: string;
+};
+
+const API_BASE = "http://localhost:8080/api/timeline";
+
 const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
 const HOURS = Array.from(
@@ -48,14 +97,37 @@ const HOURS = Array.from(
     (_, i) => DAY_START_HOUR + i
 );
 
-// 색 팔레트 (30개 정도)
 const COLOR_POOL = [
-    "#ef4444", "#f97316", "#f59e0b", "#eab308", "#84cc16",
-    "#22c55e", "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9",
-    "#3b82f6", "#6366f1", "#8b5cf6", "#a855f7", "#d946ef",
-    "#ec4899", "#f43f5e", "#fb7185", "#f97373", "#facc15",
-    "#4ade80", "#34d399", "#2dd4bf", "#38bdf8", "#60a5fa",
-    "#818cf8", "#a5b4fc", "#f9a8d4", "#fbbf24", "#22c55e",
+    "#ef4444",
+    "#f97316",
+    "#f59e0b",
+    "#eab308",
+    "#84cc16",
+    "#22c55e",
+    "#10b981",
+    "#14b8a6",
+    "#06b6d4",
+    "#0ea5e9",
+    "#3b82f6",
+    "#6366f1",
+    "#8b5cf6",
+    "#a855f7",
+    "#d946ef",
+    "#ec4899",
+    "#f43f5e",
+    "#fb7185",
+    "#f97373",
+    "#facc15",
+    "#4ade80",
+    "#34d399",
+    "#2dd4bf",
+    "#38bdf8",
+    "#60a5fa",
+    "#818cf8",
+    "#a5b4fc",
+    "#f9a8d4",
+    "#fbbf24",
+    "#22c55e",
 ];
 
 function pickColorForTask(
@@ -89,7 +161,15 @@ function totalMinutes(date: Date) {
     return date.getHours() * 60 + date.getMinutes();
 }
 
-/* ----------------- 타임라인 패널 ----------------- */
+function getTodayDateString(): string {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+/* ---------- 타임라인 패널 ---------- */
 
 function TimelinePanel({ tasks }: { tasks: Task[] }) {
     const now = new Date();
@@ -140,7 +220,6 @@ function TimelinePanel({ tasks }: { tasks: Task[] }) {
     return (
         <div className="h-full w-full bg-slate-950 border-l border-slate-800">
             <div className="h-full flex">
-                {/* 시간 숫자 */}
                 <div className="w-10 text-[11px] text-slate-400 flex flex-col justify-between py-4 pr-1">
                     {HOURS.map((h) => (
                         <div
@@ -152,7 +231,6 @@ function TimelinePanel({ tasks }: { tasks: Task[] }) {
                     ))}
                 </div>
 
-                {/* 시간 줄 */}
                 <div className="flex-1 flex flex-col py-4 pr-4">
                     {HOURS.map((h, i) => {
                         const bars = hourBars[h];
@@ -172,8 +250,8 @@ function TimelinePanel({ tasks }: { tasks: Task[] }) {
                                         style={{
                                             left: `${bar.startPct}%`,
                                             width: `${bar.widthPct}%`,
-                                            top: `${30 + idx * 12}%`, // 위아래 스택
-                                            height: "3px", // 가는 선
+                                            top: `${30 + idx * 12}%`,
+                                            height: "3px",
                                             backgroundColor: bar.color,
                                         }}
                                     />
@@ -187,13 +265,161 @@ function TimelinePanel({ tasks }: { tasks: Task[] }) {
     );
 }
 
-/* ----------------- 메인 페이지 ----------------- */
+/* ---------- Monthly Planner (오른쪽 상단 작은 캘린더) ---------- */
+
+type MonthlyPlannerProps = {
+    currentDate: string;
+    onDateChange: (date: string) => void;
+};
+
+const DAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+
+function MonthlyPlanner({ currentDate, onDateChange }: MonthlyPlannerProps) {
+    const [visibleYear, setVisibleYear] = useState<number>(() => {
+        const d = new Date(currentDate || getTodayDateString());
+        return d.getFullYear();
+    });
+    const [visibleMonth, setVisibleMonth] = useState<number>(() => {
+        const d = new Date(currentDate || getTodayDateString());
+        return d.getMonth(); // 0~11
+    });
+
+    useEffect(() => {
+        if (!currentDate) return;
+        const d = new Date(currentDate);
+        if (!isNaN(d.getTime())) {
+            setVisibleYear(d.getFullYear());
+            setVisibleMonth(d.getMonth());
+        }
+    }, [currentDate]);
+
+    const firstDayOfMonth = new Date(visibleYear, visibleMonth, 1);
+    const startWeekDay = firstDayOfMonth.getDay(); // 0(일)~6(토)
+    const daysInMonth = new Date(visibleYear, visibleMonth + 1, 0).getDate();
+
+    const cells: Date[] = [];
+    const firstCellDate = new Date(
+        visibleYear,
+        visibleMonth,
+        1 - startWeekDay
+    );
+    for (let i = 0; i < 42; i++) {
+        const d = new Date(
+            firstCellDate.getFullYear(),
+            firstCellDate.getMonth(),
+            firstCellDate.getDate() + i
+        );
+        cells.push(d);
+    }
+
+    const todayStr = getTodayDateString();
+
+    const handleMoveMonth = (delta: number) => {
+        const newMonth = visibleMonth + delta;
+        const y = visibleYear + Math.floor(newMonth / 12);
+        const m = ((newMonth % 12) + 12) % 12;
+        setVisibleYear(y);
+        setVisibleMonth(m);
+    };
+
+    const formatDateStr = (d: Date) => {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        return `${yyyy}-${mm}-${dd}`;
+    };
+
+    return (
+        <div className="border-b border-slate-800 bg-slate-950/95">
+            <div className="px-3 py-2">
+                {/* 상단 월 이동/헤더 */}
+                <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1">
+                        <button
+                            className="p-1 rounded-full hover:bg-slate-800 text-[11px]"
+                            onClick={() => handleMoveMonth(-1)}
+                        >
+                            <FaChevronLeft />
+                        </button>
+                        <div className="text-xs font-semibold">
+                            {visibleYear}년 {visibleMonth + 1}월
+                        </div>
+                        <button
+                            className="p-1 rounded-full hover:bg-slate-800 text-[11px]"
+                            onClick={() => handleMoveMonth(1)}
+                        >
+                            <FaChevronRight />
+                        </button>
+                    </div>
+                    <button
+                        className="px-2 py-1 rounded-full bg-slate-900 hover:bg-slate-800 text-[10px]"
+                        onClick={() => onDateChange(getTodayDateString())}
+                    >
+                        오늘로 이동
+                    </button>
+                </div>
+
+                {/* 요일 헤더 */}
+                <div className="grid grid-cols-7 text-[10px] text-center text-slate-400 mb-1">
+                    {DAY_LABELS.map((d) => (
+                        <div key={d} className="py-0.5">
+                            {d}
+                        </div>
+                    ))}
+                </div>
+
+                {/* 날짜 그리드 */}
+                <div className="grid grid-cols-7 text-[11px] gap-y-1">
+                    {cells.map((d, idx) => {
+                        const isCurrentMonth =
+                            d.getMonth() === visibleMonth &&
+                            d.getFullYear() === visibleYear;
+                        const dateStr = formatDateStr(d);
+                        const isToday = dateStr === todayStr;
+                        const isSelected = dateStr === currentDate;
+
+                        let textColor = "text-slate-300";
+                        if (!isCurrentMonth) textColor = "text-slate-500";
+                        if (d.getDay() === 0) textColor = "text-rose-400";
+                        if (d.getDay() === 6) textColor = "text-sky-400";
+
+                        return (
+                            <button
+                                key={idx}
+                                type="button"
+                                onClick={() => onDateChange(dateStr)}
+                                className={`h-6 flex items-center justify-center mx-auto w-6 rounded-full transition-colors ${
+                                    isSelected
+                                        ? "bg-sky-500 text-slate-50"
+                                        : isToday
+                                        ? "border border-sky-500/70"
+                                        : "hover:bg-slate-800/70"
+                                } ${textColor} ${
+                                    !isCurrentMonth
+                                        ? "opacity-60"
+                                        : "opacity-100"
+                                }`}
+                            >
+                                {d.getDate()}
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/* ---------- 메인 페이지 ---------- */
 
 export default function TimelinePage() {
     const [entries, setEntries] = useState<ChatEntry[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [input, setInput] = useState("");
-    const [idCounter, setIdCounter] = useState(1);
+
+    const [currentDate, setCurrentDate] = useState<string>(() =>
+        getTodayDateString()
+    );
 
     const [taskDefs, setTaskDefs] = useState<TaskDefinition[]>([
         { name: "미적분", color: COLOR_POOL[0] },
@@ -204,39 +430,116 @@ export default function TimelinePage() {
     const [newTaskName, setNewTaskName] = useState("");
     const [newTaskColor, setNewTaskColor] = useState<string | null>(null);
 
-    // 현재 입력 대상 task (Ctrl+/ 로 순환)
     const [activeTaskName, setActiveTaskName] = useState<string | undefined>(
         undefined
     );
 
-    // 해시태그 자동완성
     const [hashtagQuery, setHashtagQuery] = useState<string | null>(null);
     const [hashtagStart, setHashtagStart] = useState<number | null>(null);
     const [hashtagSelectedIndex, setHashtagSelectedIndex] = useState(0);
 
-    // 타임라인 열고/닫기 + 리사이즈
     const [showTimeline, setShowTimeline] = useState(true);
-    const [timelineWidthPct, setTimelineWidthPct] = useState(40); // 0~100
+    const [timelineWidthPct, setTimelineWidthPct] = useState(40);
     const [isResizing, setIsResizing] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
-
-    // textarea 자동 높이
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-    const runningTasks = tasks.filter((t) => t.status === "running");
+    const runningTasks = tasks.filter((t) => t.status === "RUNNING");
+    const isTodaySelected = currentDate === getTodayDateString();
 
+    /** ----- 초기 TaskDefinition 로드 ----- */
+    useEffect(() => {
+        const fetchTaskDefs = async () => {
+            try {
+                const res = await fetch(`${API_BASE}/task-definitions`);
+                if (!res.ok) return;
+                const data: { id: number; name: string; color: string }[] =
+                    await res.json();
+                if (data.length > 0) {
+                    setTaskDefs(
+                        data.map((d) => ({
+                            name: d.name,
+                            color: d.color,
+                        }))
+                    );
+                }
+            } catch (e) {
+                console.error("Failed to load task definitions", e);
+            }
+        };
+        fetchTaskDefs();
+    }, []);
+
+    /** ----- 선택된 날짜의 타임라인 로드 ----- */
+    useEffect(() => {
+        const fetchTimeline = async () => {
+            try {
+                const res = await fetch(
+                    `${API_BASE}?date=${encodeURIComponent(currentDate)}`
+                );
+           
+
+                 if (!res.ok) {
+                    setEntries([]);
+                    setTasks([]);
+                    return;
+                }
+
+                const data: ApiTimelineResponse = await res.json();
+
+                const loadedTasks: Task[] = data.tasks.map((t) => ({
+                    name: t.name,
+                    color: t.color,
+                    status: t.status,
+                    segments: t.segments.map((s) => ({
+                        start: new Date(s.startTime),
+                        end: s.endTime ? new Date(s.endTime) : undefined,
+                    })),
+                }));
+
+                const loadedEntries: ChatEntry[] = data.entries.map((e) => {
+                    const created = new Date(e.createdAt);
+                    return {
+                        id: e.id,
+                        createdAt: created,
+                        time: formatTime(created),
+                        text: e.text,
+                        type: e.type,
+                        taskName: e.taskName ?? undefined,
+                        systemKind: e.systemKind ?? undefined,
+                    };
+                });
+
+                setTasks(loadedTasks);
+                setEntries(loadedEntries);
+
+                const running = loadedTasks.filter(
+                    (t) => t.status === "RUNNING"
+                );
+                setActiveTaskName(running[0]?.name);
+            } catch (e) {
+                console.error("Failed to load timeline", e);
+            }
+        };
+
+        fetchTimeline();
+    }, [currentDate]);
+
+    /** ----- RUNNING 상태 변화 감시 ----- */
     useEffect(() => {
         if (runningTasks.length === 0) {
             setActiveTaskName(undefined);
             return;
         }
-        if (!activeTaskName || !runningTasks.some((t) => t.name === activeTaskName)) {
+        if (
+            !activeTaskName ||
+            !runningTasks.some((t) => t.name === activeTaskName)
+        ) {
             setActiveTaskName(runningTasks[0]?.name);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tasks]);
 
-    // 리사이즈 핸들
+    /** ----- 리사이즈 핸들 ----- */
     useEffect(() => {
         if (!isResizing) return;
 
@@ -247,7 +550,7 @@ export default function TimelinePage() {
             const totalWidth = rect.width;
             const timelineWidth = totalWidth - x;
             let pct = (timelineWidth / totalWidth) * 100;
-            pct = Math.max(20, Math.min(70, pct)); // 20%~70% 사이
+            pct = Math.max(20, Math.min(70, pct));
             setTimelineWidthPct(pct);
         };
 
@@ -271,7 +574,7 @@ export default function TimelinePage() {
                     t.name === name
                         ? {
                               ...t,
-                              status: "running",
+                              status: "RUNNING",
                               segments: [...t.segments, { start: now }],
                           }
                         : t
@@ -283,7 +586,7 @@ export default function TimelinePage() {
                     {
                         name,
                         color,
-                        status: "running",
+                        status: "RUNNING",
                         segments: [{ start: now }],
                     },
                 ];
@@ -300,33 +603,135 @@ export default function TimelinePage() {
                 if (last && !last.end) {
                     segs[segs.length - 1] = { ...last, end: now };
                 }
-                return { ...t, status: "finished", segments: segs };
+                return { ...t, status: "FINISHED", segments: segs };
             })
         );
     };
 
-    const addChat = (entry: Omit<ChatEntry, "id" | "time">) => {
-        const now = new Date();
-        const newEntry: ChatEntry = {
-            id: idCounter,
-            time: formatTime(now),
-            ...entry,
+    /** ----- 한 줄씩 채팅 저장 (서버 시간 기준) ----- */
+    const addChat = async (entry: {
+        text: string;
+        type: ChatType;
+        taskName?: string;
+        systemKind?: SystemKind;
+    }) => {
+        const payload: ApiChatCreateRequest = {
+            date: currentDate,
+            text: entry.text,
+            type: entry.type,
+            taskName: entry.taskName ?? null,
+            systemKind: entry.systemKind ?? null,
         };
-        setEntries((prev) => [...prev, newEntry]);
-        setIdCounter((prev) => prev + 1);
+
+        try {
+            const res = await fetch(`${API_BASE}/chat`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                console.error("Failed to save chat line:", res.status);
+                alert("채팅 저장 중 오류가 발생했습니다.");
+                return;
+            }
+
+            const saved: ApiChatEntry = await res.json();
+            const created = new Date(saved.createdAt);
+
+            setEntries((prev) => [
+                ...prev,
+                {
+                    id: saved.id,
+                    createdAt: created,
+                    time: formatTime(created),
+                    text: saved.text,
+                    type: saved.type,
+                    taskName: saved.taskName ?? undefined,
+                    systemKind: saved.systemKind ?? undefined,
+                },
+            ]);
+        } catch (e) {
+            console.error("Error saving chat line", e);
+            alert("채팅 저장 중 오류가 발생했습니다.");
+        }
     };
 
-    /* ---------- 입력 & 해시태그 ---------- */
+    /** ----- 채팅 수정 ----- */
+    const handleEditEntry = async (entry: ChatEntry) => {
+        const newText = window.prompt("채팅 내용 수정", entry.text);
+        if (newText === null) return;
+        if (!newText.trim()) {
+            alert("내용이 비어 있습니다.");
+            return;
+        }
 
-    const handleInputChange = (
-        e: React.ChangeEvent<HTMLTextAreaElement>
-    ) => {
+        const payload: ApiChatUpdateRequest = { text: newText };
+
+        try {
+            const res = await fetch(`${API_BASE}/chat/${entry.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                console.error("Failed to update chat:", res.status);
+                alert("채팅 수정 중 오류가 발생했습니다.");
+                return;
+            }
+
+            const updated: ApiChatEntry = await res.json();
+            const created = new Date(updated.createdAt);
+
+            setEntries((prev) =>
+                prev.map((e) =>
+                    e.id === entry.id
+                        ? {
+                              ...e,
+                              text: updated.text,
+                              createdAt: created,
+                              time: formatTime(created),
+                          }
+                        : e
+                )
+            );
+        } catch (e) {
+            console.error("Error updating chat", e);
+            alert("채팅 수정 중 오류가 발생했습니다.");
+        }
+    };
+
+    /** ----- 채팅 삭제 ----- */
+    const handleDeleteEntry = async (id: number) => {
+        if (!window.confirm("이 채팅을 삭제할까요?")) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/chat/${id}`, {
+                method: "DELETE",
+            });
+
+            if (!res.ok) {
+                console.error("Failed to delete chat:", res.status);
+                alert("채팅 삭제 중 오류가 발생했습니다.");
+                return;
+            }
+
+            setEntries((prev) => prev.filter((e) => e.id !== id));
+        } catch (e) {
+            console.error("Error deleting chat", e);
+            alert("채팅 삭제 중 오류가 발생했습니다.");
+        }
+    };
+
+    /** ----- 입력 & 해시태그 ----- */
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const value = e.target.value;
         const caret = e.target.selectionStart ?? value.length;
 
         setInput(value);
 
-        // 해시태그 감지
         let hashIndex = -1;
         for (let i = caret - 1; i >= 0; i--) {
             const ch = value[i];
@@ -349,11 +754,10 @@ export default function TimelinePage() {
             setHashtagQuery(null);
         }
 
-        // textarea 자동 높이 (최대 10줄 정도)
         if (textareaRef.current) {
             const ta = textareaRef.current;
             ta.style.height = "auto";
-            const lineHeight = 20; // 대략 20px 라고 가정
+            const lineHeight = 20;
             const maxHeight = lineHeight * 10;
             const newHeight = Math.min(ta.scrollHeight, maxHeight);
             ta.style.height = `${newHeight}px`;
@@ -382,92 +786,95 @@ export default function TimelinePage() {
         setHashtagSelectedIndex(0);
     };
 
-    /* ---------- 제출 / 키 이벤트 ---------- */
+    /** ----- 제출 / 키 이벤트 ----- */
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const raw = input;
         const trimmed = raw.trim();
         if (!trimmed) return;
 
-        const now = new Date();
-
-        // ##topic : 종료
-        if (trimmed.startsWith("##")) {
-            const name = trimmed.slice(2).trim();
-            if (!name) {
-                setInput("");
-                return;
-            }
-            const existing = findTask(name);
-            if (existing) {
-                endTask(name, now);
-                addChat({
-                    type: "system",
-                    text: `${name} task를 종료합니다.`,
-                    taskName: name,
-                    systemKind: "taskEnd",
-                });
-            } else {
-                addChat({
-                    type: "system",
-                    text: `${name} task는 존재하지 않습니다.`,
-                    systemKind: "info",
-                });
-            }
+        // ✅ 과거 날짜에는 새 채팅/명령 입력 불가
+        if (!isTodaySelected) {
+            alert("이전 날짜에는 새 채팅을 추가할 수 없습니다.");
             setInput("");
             return;
         }
 
-        // #topic : 시작/등록 + 현재 입력 task로 설정
+        const now = new Date();
+
+        // ##task : 종료 + 자동 문서 페이지 이동
+        if (trimmed.startsWith("##")) {
+            const name = trimmed.slice(2).trim();
+            setInput("");
+            if (!name) return;
+
+            const existing = findTask(name);
+            if (existing) {
+                endTask(name, now);
+                await addChat({
+                    type: "SYSTEM",
+                    text: `${name} task를 종료합니다.`,
+                    taskName: name,
+                    systemKind: "TASK_END",
+                });
+
+                // ✅ 자동저장된 문서 페이지로 이동 (추후 페이지 내용 구현)
+                const docUrl = `/docs?task=${encodeURIComponent(
+                    name
+                )}&date=${encodeURIComponent(currentDate)}`;
+                window.location.href = docUrl;
+            } else {
+                await addChat({
+                    type: "SYSTEM",
+                    text: `${name} task는 존재하지 않습니다.`,
+                    systemKind: "INFO",
+                });
+            }
+            return;
+        }
+
+        // #task : 시작 / 활성 task 설정
         if (trimmed.startsWith("#")) {
             const name = trimmed.slice(1).trim();
-            if (!name) {
-                setInput("");
-                return;
-            }
+            setInput("");
+            if (!name) return;
 
             const alreadyRunning = runningTasks.find((t) => t.name === name);
 
             if (!alreadyRunning) {
-                // 새로 시작
                 startTask(name, now);
-                addChat({
-                    type: "system",
+                await addChat({
+                    type: "SYSTEM",
                     text: `${name} task를 시작합니다.`,
                     taskName: name,
-                    systemKind: "taskStart",
+                    systemKind: "TASK_START",
                 });
             } else {
-                // 이미 진행 중이면, 현재 입력 task만 바꿔줌
-                addChat({
-                    type: "system",
+                await addChat({
+                    type: "SYSTEM",
                     text: `${name} task는 이미 진행 중입니다. 현재 입력 task로 설정합니다.`,
                     taskName: name,
-                    systemKind: "info",
+                    systemKind: "INFO",
                 });
             }
 
-            // 직후 채팅의 기본 task를 이 이름으로
             setActiveTaskName(name);
-            setInput("");
             return;
         }
 
-        // 일반 메시지: 현재 activeTaskName 기준
-        addChat({
-            type: "user",
+        // 일반 유저 채팅
+        setInput("");
+        await addChat({
+            type: "USER",
             text: raw,
             taskName: activeTaskName,
         });
-
-        setInput("");
     };
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-        // Ctrl + / : task 전환 (등록된 running task들 사이를 순환)
         if (e.ctrlKey && e.key === "/") {
             e.preventDefault();
-            const running = tasks.filter((t) => t.status === "running");
+            const running = tasks.filter((t) => t.status === "RUNNING");
             if (running.length === 0) return;
             if (!activeTaskName) {
                 setActiveTaskName(running[0].name);
@@ -479,20 +886,20 @@ export default function TimelinePage() {
             return;
         }
 
-        // 해시태그 자동완성 네비게이션
         if (hashtagSuggestions.length > 0 && hashtagQuery !== null) {
             if (e.key === "ArrowDown") {
                 e.preventDefault();
-                setHashtagSelectedIndex((prev) =>
-                    (prev + 1) % hashtagSuggestions.length
+                setHashtagSelectedIndex(
+                    (prev) => (prev + 1) % hashtagSuggestions.length
                 );
                 return;
             }
             if (e.key === "ArrowUp") {
                 e.preventDefault();
-                setHashtagSelectedIndex((prev) =>
-                    (prev - 1 + hashtagSuggestions.length) %
-                    hashtagSuggestions.length
+                setHashtagSelectedIndex(
+                    (prev) =>
+                        (prev - 1 + hashtagSuggestions.length) %
+                        hashtagSuggestions.length
                 );
                 return;
             }
@@ -506,10 +913,9 @@ export default function TimelinePage() {
             }
         }
 
-        // Enter → 전송, Shift+Enter는 줄바꿈
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            handleSubmit();
+            void handleSubmit();
         }
     };
 
@@ -519,13 +925,13 @@ export default function TimelinePage() {
         return t?.color;
     };
 
-    /* ---- task 카테고리 등록 모달 ---- */
+    /** ----- 카테고리 추가 ----- */
 
     const availableColors = COLOR_POOL.filter(
         (c) => !taskDefs.some((d) => d.color === c)
     );
 
-    const handleAddTaskDef = () => {
+    const handleAddTaskDef = async () => {
         const name = newTaskName.trim();
         if (!name) return;
         if (taskDefs.some((d) => d.name === name)) return;
@@ -536,30 +942,58 @@ export default function TimelinePage() {
                 ? availableColors[0]
                 : COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)]);
 
-        setTaskDefs((prev) => [...prev, { name, color }]);
-        setNewTaskName("");
-        setNewTaskColor(null);
-        setShowTaskModal(false);
+        try {
+            const params = new URLSearchParams();
+            params.set("name", name);
+            params.set("color", color);
+
+            const res = await fetch(
+                `${API_BASE}/task-definitions?${params.toString()}`,
+                {
+                    method: "POST",
+                }
+            );
+
+            if (!res.ok) {
+                console.error("Failed to create task definition:", res.status);
+                alert("카테고리 저장에 실패했습니다.");
+                return;
+            }
+
+            const saved: { id: number; name: string; color: string } =
+                await res.json();
+
+            setTaskDefs((prev) => [
+                ...prev,
+                { name: saved.name, color: saved.color },
+            ]);
+            setNewTaskName("");
+            setNewTaskColor(null);
+            setShowTaskModal(false);
+        } catch (e) {
+            console.error("Error creating task definition", e);
+            alert("카테고리 저장 중 오류가 발생했습니다.");
+        }
     };
 
     const chatWidthPct = showTimeline ? 100 - timelineWidthPct : 100;
 
     return (
         <div className="h-screen flex flex-col bg-slate-950 text-slate-50">
-            {/* 전체 헤더 */}
             <header className="border-b border-slate-800 px-4 py-2 flex items-center justify-between bg-slate-950/95">
                 <div className="flex items-center gap-2">
                     <button
                         className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-xs"
                         onClick={() => {
-                            // 프로젝트에 맞게 바꿔 쓰면 됨 (React Router면 navigate 사용)
                             window.location.href = "/";
                         }}
                     >
                         <FaHome className="text-slate-300" />
                         <span>/Home</span>
                     </button>
-                    <span className="text-sm font-semibold ml-2">Timeline</span>
+                    <span className="text-sm font-semibold ml-2">
+                        Timeline ({currentDate})
+                    </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-slate-300">
                     <button
@@ -574,7 +1008,9 @@ export default function TimelinePage() {
                         onClick={() => setShowTimeline((prev) => !prev)}
                     >
                         <FaClock />
-                        <span>{showTimeline ? "타임라인 숨기기" : "타임라인 보기"}</span>
+                        <span>
+                            {showTimeline ? "타임라인 숨기기" : "타임라인 보기"}
+                        </span>
                         {showTimeline ? (
                             <FaChevronRight className="text-[10px]" />
                         ) : (
@@ -584,9 +1020,9 @@ export default function TimelinePage() {
                 </div>
             </header>
 
-            {/* 본문: 채팅 + 타임라인 */}
-            <div className="flex flex-1" ref={containerRef}>
-                {/* 채팅 영역 */}
+            {/* 전체 바디: 왼쪽 채팅, 오른쪽 (위: 캘린더, 아래: 타임라인) */}
+            <div className="flex-1 flex" ref={containerRef}>
+                {/* 왼쪽: 채팅 영역 */}
                 <div
                     className="flex flex-col"
                     style={{ width: `${chatWidthPct}%` }}
@@ -594,17 +1030,18 @@ export default function TimelinePage() {
                     <main className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
                         {entries.length === 0 && (
                             <div className="h-full flex items-center justify-center text-sm text-slate-500 text-center px-6">
-                                예: <code className="text-sky-300">#미적분</code> 입력 후 공부
-                                내용을 적으면 오른쪽 타임라인에 선이 그려집니다.
+                                예:{" "}
+                                <code className="text-sky-300">#미적분</code>{" "}
+                                입력 후 공부 내용을 적으면 오른쪽
+                                타임라인에 선이 그려집니다.
                             </div>
                         )}
 
                         {entries.map((entry) => {
-                            const isSystem = entry.type === "system";
+                            const isSystem = entry.type === "SYSTEM";
                             const color = getTaskColor(entry.taskName);
 
-                            // task 시작 카드
-                            if (isSystem && entry.systemKind === "taskStart") {
+                            if (isSystem && entry.systemKind === "TASK_START") {
                                 return (
                                     <div
                                         key={entry.id}
@@ -617,14 +1054,18 @@ export default function TimelinePage() {
                                             <div className="inline-flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2">
                                                 <div
                                                     className="w-4 h-4 rounded-full"
-                                                    style={{ backgroundColor: color ?? "#22c55e" }}
+                                                    style={{
+                                                        backgroundColor:
+                                                            color ?? "#22c55e",
+                                                    }}
                                                 />
                                                 <div className="flex flex-col">
                                                     <span className="text-[11px] uppercase tracking-wide text-emerald-400">
                                                         TASK START
                                                     </span>
                                                     <span className="text-sm">
-                                                        {entry.taskName} task를 시작합니다.
+                                                        {entry.taskName} task를
+                                                        시작합니다.
                                                     </span>
                                                 </div>
                                             </div>
@@ -633,8 +1074,7 @@ export default function TimelinePage() {
                                 );
                             }
 
-                            // task 종료 카드
-                            if (isSystem && entry.systemKind === "taskEnd") {
+                            if (isSystem && entry.systemKind === "TASK_END") {
                                 return (
                                     <div
                                         key={entry.id}
@@ -646,16 +1086,15 @@ export default function TimelinePage() {
                                         <div className="flex-1">
                                             <div className="inline-flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2">
                                                 <div className="relative w-4 h-4">
-                                                    {/* 기존 색 동그라미 — TASK START 아이콘과 동일한 모양 유지 */}
                                                     <div
                                                         className="absolute inset-0 rounded-full"
-                                                        style={{ backgroundColor: color ?? "#64748b" }}
+                                                        style={{
+                                                            backgroundColor:
+                                                                color ??
+                                                                "#64748b",
+                                                        }}
                                                     />
-
-                                                    {/* 체크 표시 — 위에 중첩 */}
-                                                    <FaCheck
-                                                        className="absolute inset-0 m-auto text-white text-[8px]"
-                                                    />
+                                                    <FaCheck className="absolute inset-0 m-auto text-white text-[8px]" />
                                                 </div>
 
                                                 <div className="flex flex-col">
@@ -663,7 +1102,8 @@ export default function TimelinePage() {
                                                         TASK END
                                                     </span>
                                                     <span className="text-sm">
-                                                        {entry.taskName} task를 종료합니다.
+                                                        {entry.taskName} task를
+                                                        종료합니다.
                                                     </span>
                                                 </div>
                                             </div>
@@ -672,7 +1112,6 @@ export default function TimelinePage() {
                                 );
                             }
 
-                            // 일반 / 기타 시스템
                             return (
                                 <div
                                     key={entry.id}
@@ -682,7 +1121,7 @@ export default function TimelinePage() {
                                         {entry.time}
                                     </div>
 
-                                    <div className="flex-1">
+                                    <div className="flex-1 flex items-start gap-2">
                                         <div
                                             className={`inline-flex max-w-[90%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${
                                                 isSystem
@@ -691,13 +1130,40 @@ export default function TimelinePage() {
                                             }`}
                                             style={
                                                 color && !isSystem
-                                                    ? { backgroundColor: color }
+                                                    ? {
+                                                          backgroundColor:
+                                                              color,
+                                                      }
                                                     : isSystem
-                                                    ? { backgroundColor: "#1f2933" }
+                                                    ? {
+                                                          backgroundColor:
+                                                              "#1f2933",
+                                                      }
                                                     : undefined
                                             }
                                         >
                                             {entry.text}
+                                        </div>
+
+                                        <div className="flex flex-col gap-1 mt-1">
+                                            <button
+                                                className="p-1 rounded-full hover:bg-slate-800 text-[10px] text-slate-400"
+                                                title="수정"
+                                                onClick={() =>
+                                                    handleEditEntry(entry)
+                                                }
+                                            >
+                                                <FaPen />
+                                            </button>
+                                            <button
+                                                className="p-1 rounded-full hover:bg-slate-800 text-[10px] text-slate-400"
+                                                title="삭제"
+                                                onClick={() =>
+                                                    handleDeleteEntry(entry.id)
+                                                }
+                                            >
+                                                <FaTrash />
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -705,48 +1171,66 @@ export default function TimelinePage() {
                         })}
                     </main>
 
-                    {/* 입력 영역 */}
                     <footer className="border-t border-slate-800 px-4 py-3">
                         <div className="rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2 flex flex-col gap-2">
                             <textarea
                                 ref={textareaRef}
-                                className="w-full bg-transparent text-sm outline-none resize-none min-h-[40px] placeholder:text-slate-500"
-                                placeholder="#미적분 (시작/등록), ##미적분 (종료) · Enter: 전송 / Shift+Enter: 줄바꿈 · Ctrl+/: task 전환"
+                                className="w-full bg-transparent text-sm outline-none resize-none min-h-[40px] placeholder:text-slate-500 disabled:text-slate-500 disabled:cursor-not-allowed"
+                                placeholder={
+                                    isTodaySelected
+                                        ? "#미적분 (시작/등록), ##미적분 (종료) · Enter: 전송 / Shift+Enter: 줄바꿈 · Ctrl+/: task 전환"
+                                        : "이전 날짜에는 새 채팅을 추가할 수 없습니다."
+                                }
                                 value={input}
                                 onChange={handleInputChange}
                                 onKeyDown={handleKeyDown}
+                                disabled={!isTodaySelected}
                             />
 
-                            {/* 해시태그 자동완성 드롭다운 */}
-                            {hashtagSuggestions.length > 0 && hashtagQuery !== null && (
-                                <div className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 text-xs max-h-40 overflow-y-auto shadow-lg">
-                                    {hashtagSuggestions.map((d, idx) => {
-                                        const selected = idx === hashtagSelectedIndex;
-                                        return (
-                                            <button
-                                                key={d.name}
-                                                type="button"
-                                                onClick={() => handleSelectHashtag(d.name)}
-                                                className={`w-full text-left px-2 py-1 flex items-center gap-2 ${
-                                                    selected ? "bg-slate-800" : "hover:bg-slate-800"
-                                                }`}
-                                            >
-                                                <span
-                                                    className="w-3 h-3 rounded-full"
-                                                    style={{ backgroundColor: d.color }}
-                                                />
-                                                <span>#{d.name}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                            {hashtagSuggestions.length > 0 &&
+                                hashtagQuery !== null &&
+                                isTodaySelected && (
+                                    <div className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 text-xs max-h-40 overflow-y-auto shadow-lg">
+                                        {hashtagSuggestions.map((d, idx) => {
+                                            const selected =
+                                                idx ===
+                                                hashtagSelectedIndex;
+                                            return (
+                                                <button
+                                                    key={d.name}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleSelectHashtag(
+                                                            d.name
+                                                        )
+                                                    }
+                                                    className={`w-full text-left px-2 py-1 flex items-center gap-2 ${
+                                                        selected
+                                                            ? "bg-slate-800"
+                                                            : "hover:bg-slate-800"
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className="w-3 h-3 rounded-full"
+                                                        style={{
+                                                            backgroundColor:
+                                                                d.color,
+                                                        }}
+                                                    />
+                                                    <span>#{d.name}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
 
                             <div className="flex justify-between text-[11px] text-slate-500">
                                 <span>
                                     현재 입력 task:{" "}
                                     {activeTaskName ? (
-                                        <span className="text-sky-300">{activeTaskName}</span>
+                                        <span className="text-sky-300">
+                                            {activeTaskName}
+                                        </span>
                                     ) : (
                                         "없음"
                                     )}{" "}
@@ -756,14 +1240,16 @@ export default function TimelinePage() {
                                     진행 중:{" "}
                                     {runningTasks.length === 0
                                         ? "없음"
-                                        : runningTasks.map((t) => t.name).join(", ")}
+                                        : runningTasks
+                                              .map((t) => t.name)
+                                              .join(", ")}
                                 </span>
                             </div>
                         </div>
                     </footer>
                 </div>
 
-                {/* 리사이즈 핸들 + 타임라인 */}
+                {/* 오른쪽: 위 캘린더 + 아래 타임라인 패널 */}
                 {showTimeline && (
                     <>
                         <div
@@ -771,21 +1257,32 @@ export default function TimelinePage() {
                             onMouseDown={() => setIsResizing(true)}
                         />
                         <div
-                            className="h-full"
+                            className="h-full flex flex-col border-l border-slate-800"
                             style={{ width: `${timelineWidthPct}%` }}
                         >
-                            <TimelinePanel tasks={tasks} />
+                            {/* 위쪽: 작은 월간 플래너 */}
+                            <div className="shrink-0">
+                                <MonthlyPlanner
+                                    currentDate={currentDate}
+                                    onDateChange={setCurrentDate}
+                                />
+                            </div>
+                            {/* 아래쪽: 기존 타임라인 패널 */}
+                            <div className="flex-1">
+                                <TimelinePanel tasks={tasks} />
+                            </div>
                         </div>
                     </>
                 )}
             </div>
 
-            {/* task 카테고리 등록 모달 */}
             {showTaskModal && (
                 <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
                     <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-4 space-y-4">
                         <div className="flex items-center justify-between">
-                            <h2 className="text-sm font-semibold">Task 카테고리 등록</h2>
+                            <h2 className="text-sm font-semibold">
+                                Task 카테고리 등록
+                            </h2>
                             <button
                                 className="text-slate-400 hover:text-slate-200"
                                 onClick={() => setShowTaskModal(false)}
@@ -802,7 +1299,9 @@ export default function TimelinePage() {
                                 <input
                                     className="w-full rounded-md bg-slate-800 border border-slate-700 px-2 py-1 text-sm outline-none"
                                     value={newTaskName}
-                                    onChange={(e) => setNewTaskName(e.target.value)}
+                                    onChange={(e) =>
+                                        setNewTaskName(e.target.value)
+                                    }
                                     placeholder="예: 알고리즘, 논문읽기"
                                 />
                             </div>
@@ -813,14 +1312,18 @@ export default function TimelinePage() {
                                 </label>
                                 <div className="flex flex-wrap gap-1">
                                     {COLOR_POOL.map((c) => {
-                                        const used = taskDefs.some((d) => d.color === c);
+                                        const used = taskDefs.some(
+                                            (d) => d.color === c
+                                        );
                                         const selected = newTaskColor === c;
                                         return (
                                             <button
                                                 key={c}
                                                 type="button"
                                                 disabled={used}
-                                                onClick={() => setNewTaskColor(c)}
+                                                onClick={() =>
+                                                    setNewTaskColor(c)
+                                                }
                                                 className={`w-6 h-6 rounded-full border ${
                                                     selected
                                                         ? "border-white scale-110"
@@ -850,7 +1353,9 @@ export default function TimelinePage() {
                                         >
                                             <span
                                                 className="w-3 h-3 rounded-full"
-                                                style={{ backgroundColor: d.color }}
+                                                style={{
+                                                    backgroundColor: d.color,
+                                                }}
                                             />
                                             <span>{d.name}</span>
                                         </div>

@@ -71,8 +71,15 @@ jobs:
             docker rm frontend-app || true
 
             # 새 컨테이너 실행 (80 포트 바인딩)
+            docker network create app-net || true
+
+            docker stop frontend-app || true
+            docker rm frontend-app || true
+
             docker run -d \
               --name frontend-app \
+              --network app-net \
               --restart always \
               -p 80:80 \
               frontend-app:latest
+

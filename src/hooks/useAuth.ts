@@ -1,4 +1,5 @@
 // src/hooks/useAuth.ts
+import axios from "axios";
 import { useEffect, useState } from "react";
 
 interface MeResponse {
@@ -13,19 +14,27 @@ export function useAuth() {
   const [user, setUser] = useState<MeResponse | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/me`, {
-          credentials: "include", // 쿠키 포함
+        const res = await axios.get<MeResponse>(`${API_BASE}/api/me`, {
+          withCredentials: true,
         });
 
-        const data: MeResponse = await res.json();
-        setUser(data);
+        if (!cancelled) {
+          setUser(res.data);
+        }
       } catch (e) {
         console.error("me 호출 실패", e);
-        setUser({ authenticated: false });
+        if (!cancelled) {
+          setUser({authenticated: false});
+        }
       }
     })();
+    return () => {
+      cancelled = true;
+    }
   }, []);
 
   return user;

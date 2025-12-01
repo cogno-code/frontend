@@ -7,9 +7,10 @@ export default function HomePage() {
     const user = useAuth();
     const navigate = useNavigate();
 
-    const LOGOUT_URL = import.meta.env.DEV
-        ? "http://localhost:8080/logout"
-        : "/logout";
+    const API_BASE = import.meta.env.VITE_API_URL;
+    const LOGOUT_URL = `${API_BASE}/logout`;
+
+
 
     // 1) 로딩 상태
     if (!user) {

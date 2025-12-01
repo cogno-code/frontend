@@ -63,23 +63,27 @@ jobs:
           script: |
             cd /home/ubuntu/frontend
 
+            # certbot용 디렉토리(없으면 생성)
+            mkdir -p certbot/www
+            mkdir -p certbot/conf
+
             # Docker 이미지 로드
             docker load -i frontend-app.tar
+
+            # 네트워크 생성 (이미 있으면 에러 무시)
+            docker network create app-net || true
 
             # 기존 컨테이너 중지/삭제 (있으면)
             docker stop frontend-app || true
             docker rm frontend-app || true
 
-            # 새 컨테이너 실행 (80 포트 바인딩)
-            docker network create app-net || true
-
-            docker stop frontend-app || true
-            docker rm frontend-app || true
-
+            # 새 컨테이너 실행: 80, 443 + certbot 볼륨 마운트
             docker run -d \
               --name frontend-app \
               --network app-net \
               --restart always \
               -p 80:80 \
+              -p 443:443 \
+              -v /home/ubuntu/frontend/certbot/www:/var/www/certbot \
+              -v /home/ubuntu/frontend/certbot/conf:/etc/letsencrypt \
               frontend-app:latest
-

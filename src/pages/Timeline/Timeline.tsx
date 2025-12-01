@@ -647,7 +647,7 @@ export default function TimelinePage() {
             />
 
             {/* 전체 바디: 왼쪽 채팅, 오른쪽 (위: 캘린더, 아래: 타임라인) */}
-            <div className="flex-1 flex" ref={containerRef}>
+            <div className="flex-1 flex min-h-0" ref={containerRef}>
                 {/* 왼쪽: 채팅 영역 */}
                 <div
                     className="flex flex-col"
@@ -675,25 +675,28 @@ export default function TimelinePage() {
                             </button>
                         </div>
                     )}
-                    <ChatPanel
-                        entries={entries}
-                        getTaskColor={getTaskColor}
-                        input={input}
-                        onChangeInput={handleInputChange}
-                        onKeyDown={handleKeyDown}
-                        textareaRef={textareaRef}
-                        isTodaySelected={isTodaySelected}
-                        activeTaskName={activeTaskName}
-                        runningTaskNames={runningTasks.map((t) => t.name)}
-                        hashtagSuggestions={hashtagSuggestions}
-                        hashtagQuery={hashtagQuery}
-                        hashtagSelectedIndex={hashtagSelectedIndex}
-                        onSelectHashtag={handleSelectHashtag}
-                        onEditEntry={handleEditEntry}
-                        onDeleteEntry={handleDeleteEntry}
-                        currentDate={currentDate}
-                        hashtagPrefix={hashtagPrefix}
-                    />
+                    {/* ✅ ChatPanel이 남은 세로 공간을 모두 쓰게 하고, 내부에서 스크롤 처리 */}
+                    <div className="flex-1 min-h-0">
+                        <ChatPanel
+                            entries={entries}
+                            getTaskColor={getTaskColor}
+                            input={input}
+                            onChangeInput={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            textareaRef={textareaRef}
+                            isTodaySelected={isTodaySelected}
+                            activeTaskName={activeTaskName}
+                            runningTaskNames={runningTasks.map((t) => t.name)}
+                            hashtagSuggestions={hashtagSuggestions}
+                            hashtagQuery={hashtagQuery}
+                            hashtagSelectedIndex={hashtagSelectedIndex}
+                            onSelectHashtag={handleSelectHashtag}
+                            onEditEntry={handleEditEntry}
+                            onDeleteEntry={handleDeleteEntry}
+                            currentDate={currentDate}
+                            hashtagPrefix={hashtagPrefix}
+                        />
+                    </div>
                 </div>
 
                 {/* 오른쪽: 위 캘린더 + 아래 타임라인 패널 */}

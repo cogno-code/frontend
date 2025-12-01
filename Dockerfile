@@ -14,11 +14,14 @@ FROM nginx:1.27-alpine
 # ✅ 우리가 만든 nginx.conf를 기본 설정으로 사용
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# ✅ webroot for certbot
+RUN mkdir -p /var/www/certbot
+
 WORKDIR /usr/share/nginx/html
 RUN rm -rf ./*
 
 COPY --from=builder /app/dist ./
 
-EXPOSE 80
+EXPOSE 80 443
 
 CMD ["nginx", "-g", "daemon off;"]

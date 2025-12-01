@@ -1,6 +1,8 @@
+const BACKEND_URL = import.meta.env.VITE_API_URL;
+
 const KAKAO_AUTH_URL = import.meta.env.DEV
-  ? "http://localhost:8080/oauth2/authorization/kakao"
-  : "/oauth2/authorization/kakao";
+  ? `${BACKEND_URL}/oauth2/authorization/kakao`
+  : `${BACKEND_URL}/oauth2/authorization/kakao`;
 
 export default function KakaoLoginButton() {
   const handleClick = () => {

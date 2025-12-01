@@ -7,8 +7,7 @@ interface MeResponse {
   nickname?: string;
 }
 
-const API_BASE =
-  import.meta.env.DEV ? "http://localhost:8080" : "";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export function useAuth() {
   const [user, setUser] = useState<MeResponse | null>(null);
@@ -17,7 +16,7 @@ export function useAuth() {
     (async () => {
       try {
         const res = await fetch(`${API_BASE}/api/me`, {
-          credentials: "include", // ✅ 세션 쿠키 같이 보내기
+          credentials: "include", // 쿠키 포함
         });
 
         const data: MeResponse = await res.json();

@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import type { KeyboardEvent } from "react";
 import { FaTrash, FaPen, FaCheck } from "react-icons/fa";
 import type { ChatEntry, TaskDefinition } from "../../timelineTypes";
+import Todo from "../../../../components/Todo/Todo";
 
 type ChatPanelProps = {
     entries: ChatEntry[];
@@ -35,6 +36,7 @@ type ChatPanelProps = {
     currentDate: string;
 
     hashtagPrefix: "#" | "##";   // ✅ 추가
+    showTodoInline?: boolean;
 };
 
 export default function ChatPanel({
@@ -55,16 +57,17 @@ export default function ChatPanel({
     onDeleteEntry,
     currentDate,
     hashtagPrefix,
+    showTodoInline,
 }: ChatPanelProps) {
     // ✅ 채팅 영역 스크롤 컨테이너 ref
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-    // ✅ entries가 바뀔 때마다 항상 맨 아래로 스크롤
     useEffect(() => {
         const el = scrollContainerRef.current;
         if (!el) return;
         el.scrollTop = el.scrollHeight;
-    }, [entries]);
+    }, [entries, showTodoInline]);
+
     return (
         <div className="flex flex-col h-full">
             {/* 채팅 내역 */}
@@ -216,6 +219,12 @@ export default function ChatPanel({
                         </div>
                     );
                 })}
+                {/* 🔥 여기서 Todo를 메시지처럼 끼워넣기 */}
+                {showTodoInline && (
+                    <div className="mt-3">
+                        <Todo date={currentDate} />
+                    </div>
+                )}
             </main>
 
             {/* 입력 영역 */}
@@ -268,6 +277,27 @@ export default function ChatPanel({
                                 })}
                             </div>
                         )}
+
+                    {/* /Todo 커맨드 자동완성 */}
+                    {isTodaySelected &&
+                        hashtagQuery === null && // 해시태그 모드 아닐 때만
+                        input.trim().startsWith("/") &&
+                        "/todo".startsWith(input.trim().toLowerCase()) &&
+                        input.trim().length > 0 && (
+                            <div className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 text-xs shadow-lg">
+                                <button
+                                    type="button"
+                                    className="w-full text-left px-2 py-1 hover:bg-slate-800 flex items-center gap-2"
+                                    onClick={() =>
+                                        onChangeInput({ target: { value: "/Todo" } } as any)
+                                    }
+                                >
+                                    <span className="text-sky-300">/Todo</span>
+                                    <span className="text-slate-400">오늘 Todo 보드 열기</span>
+                                </button>
+                            </div>
+                        )}
+
 
 
                     {/* 아래쪽 상태 줄 */}

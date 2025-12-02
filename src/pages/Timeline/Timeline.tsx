@@ -9,7 +9,13 @@ import { useTimelineData } from "./hooks/useTimelineData";
 import { useChatInput } from "./hooks/useChatInput";
 import { useResizableTimeline } from "./hooks/useResizableTimeline";
 
+import { useState } from "react";
+import type { KeyboardEvent } from "react";
+
 export default function TimelinePage() {
+    const [showTodoInline, setShowTodoInline] = useState(false);
+
+
     const {
         showTimeline, toggleTimeline, timelineWidthPct, chatWidthPct, containerRef, startResizing,
     } = useResizableTimeline(40);
@@ -20,11 +26,54 @@ export default function TimelinePage() {
     } = useTimelineData(taskDefs);
     const {
         input, hashtagPrefix, hashtagQuery, hashtagSelectedIndex, hashtagSuggestions, textareaRef,
-        handleInputChange, handleSelectHashtag, handleKeyDown,
+        handleInputChange, handleSelectHashtag, handleKeyDown: baseHandleKeyDown,
     } = useChatInput({
         taskDefs, isTodaySelected, runningTasks, activeTaskName,
         setActiveTaskName, currentDate, findTask, startTask, endTask, addChat, setLastEndedTask,
     });
+
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+        const rawValue = textareaRef.current?.value ?? "";
+        const trimmed = rawValue.trim();
+
+        // 🔹 1) /Todo 자동완성 (Tab)
+        if (e.key === "Tab") {
+            const lower = trimmed.toLowerCase();
+            const target = "/todo";
+            if (target.startsWith(lower) && lower.length > 0) {
+                e.preventDefault();
+                const fakeEvent = {
+                    target: { value: "/Todo" },
+                } as any;
+                handleInputChange(fakeEvent);
+                return;
+            }
+        }
+
+        // 🔹 2) /Todo 입력 시, 채팅 대신 Todo 컴포넌트 띄우기
+        if (e.key === "Enter" && !e.shiftKey) {
+            if (trimmed === "/Todo") {
+                e.preventDefault();
+
+                // 채팅 리스트 안에 Todo 보이게
+                setShowTodoInline(true);   // ✅ 여기!
+
+                // 입력창 비우기
+                const fakeEvent = {
+                    target: { value: "" },
+                } as any;
+                handleInputChange(fakeEvent);
+
+                return;
+            }
+        }
+
+        // 나머지는 원래 로직
+        baseHandleKeyDown(e);
+    };
+
+
+
 
     /** ----- 채팅 수정 ----- */
     const handleEditEntry = async (entry: ChatEntry) => {
@@ -86,27 +135,34 @@ export default function TimelinePage() {
                         </div>
                     )}
                     {/* ✅ ChatPanel이 남은 세로 공간을 모두 쓰게 하고, 내부에서 스크롤 처리 */}
-                    <div className="flex-1 min-h-0">
-                        <ChatPanel
-                            entries={entries}
-                            getTaskColor={getTaskColor}
-                            input={input}
-                            onChangeInput={handleInputChange}
-                            onKeyDown={handleKeyDown}
-                            textareaRef={textareaRef}
-                            isTodaySelected={isTodaySelected}
-                            activeTaskName={activeTaskName}
-                            runningTaskNames={runningTasks.map((t) => t.name)}
-                            hashtagSuggestions={hashtagSuggestions}
-                            hashtagQuery={hashtagQuery}
-                            hashtagSelectedIndex={hashtagSelectedIndex}
-                            onSelectHashtag={handleSelectHashtag}
-                            onEditEntry={handleEditEntry}
-                            onDeleteEntry={handleDeleteEntry}
-                            currentDate={currentDate}
-                            hashtagPrefix={hashtagPrefix}
-                        />
+                    <div className="flex-1 min-h-0 flex flex-col">
+                        <div className="flex-1 min-h-0">
+                            <div className="flex-1 min-h-0">
+                                <ChatPanel
+                                    entries={entries}
+                                    getTaskColor={getTaskColor}
+                                    input={input}
+                                    onChangeInput={handleInputChange}
+                                    onKeyDown={handleKeyDown}
+                                    textareaRef={textareaRef}
+                                    isTodaySelected={isTodaySelected}
+                                    activeTaskName={activeTaskName}
+                                    runningTaskNames={runningTasks.map((t) => t.name)}
+                                    hashtagSuggestions={hashtagSuggestions}
+                                    hashtagQuery={hashtagQuery}
+                                    hashtagSelectedIndex={hashtagSelectedIndex}
+                                    onSelectHashtag={handleSelectHashtag}
+                                    onEditEntry={handleEditEntry}
+                                    onDeleteEntry={handleDeleteEntry}
+                                    currentDate={currentDate}
+                                    hashtagPrefix={hashtagPrefix}
+                                    showTodoInline={showTodoInline}
+                                />
+                            </div>
+
+                        </div>
                     </div>
+
                 </div>
 
                 {/* 오른쪽: 위 캘린더 + 아래 타임라인 패널 */}

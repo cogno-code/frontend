@@ -432,7 +432,7 @@ export default function Todo({ date }: TodoProps) {
                 .sort((a, b) => a.order - b.order);
 
             const [moved] = sourceItems.splice(source.index, 1);
-            
+
             if (!moved) {
                 return prev;
             }
@@ -494,9 +494,6 @@ export default function Todo({ date }: TodoProps) {
                 <h2 className="text-lg font-semibold text-slate-100">
                     Todo
                 </h2>
-                <div className="text-xs text-slate-400">
-                    {saving ? "Saving…" : "Auto-saved"}
-                </div>
             </div>
 
             <DragDropContext onDragEnd={onDragEnd}>

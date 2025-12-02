@@ -125,32 +125,27 @@ export default function TimelinePage() {
                         </div>
                     )}
                     {/* ✅ ChatPanel이 남은 세로 공간을 모두 쓰게 하고, 내부에서 스크롤 처리 */}
-                    <div className="flex-1 min-h-0 flex flex-col overflow-auto">
-                        <div className="flex-1 min-h-0">
-                            <div className="flex-1 min-h-0">
-                                <ChatPanel
-                                    entries={entries}
-                                    getTaskColor={getTaskColor}
-                                    input={input}
-                                    onChangeInput={handleInputChange}
-                                    onKeyDown={handleKeyDown}
-                                    textareaRef={textareaRef}
-                                    isTodaySelected={isTodaySelected}
-                                    activeTaskName={activeTaskName}
-                                    runningTaskNames={runningTasks.map((t) => t.name)}
-                                    hashtagSuggestions={hashtagSuggestions}
-                                    hashtagQuery={hashtagQuery}
-                                    hashtagSelectedIndex={hashtagSelectedIndex}
-                                    onSelectHashtag={handleSelectHashtag}
-                                    onEditEntry={handleEditEntry}
-                                    onDeleteEntry={handleDeleteEntry}
-                                    currentDate={currentDate}
-                                    hashtagPrefix={hashtagPrefix}
-                                    showTodoInline={showTodoInline}
-                                />
-                            </div>
-
-                        </div>
+                    <div className="flex-1 min-h-0 flex flex-col">
+                        <ChatPanel
+                            entries={entries}
+                            getTaskColor={getTaskColor}
+                            input={input}
+                            onChangeInput={handleInputChange}
+                            onKeyDown={handleKeyDown}
+                            textareaRef={textareaRef}
+                            isTodaySelected={isTodaySelected}
+                            activeTaskName={activeTaskName}
+                            runningTaskNames={runningTasks.map((t) => t.name)}
+                            hashtagSuggestions={hashtagSuggestions}
+                            hashtagQuery={hashtagQuery}
+                            hashtagSelectedIndex={hashtagSelectedIndex}
+                            onSelectHashtag={handleSelectHashtag}
+                            onEditEntry={handleEditEntry}
+                            onDeleteEntry={handleDeleteEntry}
+                            currentDate={currentDate}
+                            hashtagPrefix={hashtagPrefix}
+                            showTodoInline={showTodoInline}
+                        />
                     </div>
 
                 </div>

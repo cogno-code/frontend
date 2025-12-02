@@ -432,6 +432,12 @@ export default function Todo({ date }: TodoProps) {
                 .sort((a, b) => a.order - b.order);
 
             const [moved] = sourceItems.splice(source.index, 1);
+            
+            if (!moved) {
+                return prev;
+            }
+
+            const movedId = moved.id;
 
             destItems.splice(destination.index, 0, {
                 ...moved,
@@ -449,6 +455,17 @@ export default function Todo({ date }: TodoProps) {
 
             const next = prev.map((it) => {
                 const key = it.taskDefId ?? null;
+
+                // 🔥 이동한 아이템은 dest 그룹 기준으로 강제 업데이트
+                if (it.id === movedId) {
+                    return (
+                        updatedDest.find((u) => u.id === movedId) ?? {
+                            ...it,
+                            taskDefId: destTaskDefId,
+                        }
+                    );
+                }
+
                 if (key === sourceTaskDefId) {
                     return updatedSource.find((u) => u.id === it.id) ?? it;
                 }

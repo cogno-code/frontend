@@ -15,7 +15,6 @@ type ChatPanelProps = {
     onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 
-
     /** 오늘 날짜인지 여부 (이전 날짜면 입력 비활성화) */
     isTodaySelected: boolean;
 
@@ -35,7 +34,7 @@ type ChatPanelProps = {
 
     currentDate: string;
 
-    hashtagPrefix: "#" | "##";   // ✅ 추가
+    hashtagPrefix: "#" | "##"; // ✅ 추가
     showTodoInline?: boolean;
 };
 
@@ -61,8 +60,10 @@ export default function ChatPanel({
 }: ChatPanelProps) {
     // ✅ 채팅 영역 스크롤 컨테이너 ref
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    // ✅ 맨 아래 지점 ref (항상 이곳까지 스크롤)
+    const bottomRef = useRef<HTMLDivElement | null>(null);
 
-    // 🔹 "/Todo" 채팅이 있는지 확인
+    // 🔹 "/todo" 채팅이 있는지 확인
     const hasTodoCommand = useMemo(
         () =>
             entries.some(
@@ -76,17 +77,39 @@ export default function ChatPanel({
     // 🔹 최종적으로 Todo를 보여줄지 여부
     const effectiveShowTodo = showTodoInline || hasTodoCommand;
 
-    useEffect(() => {
-        const el = scrollContainerRef.current;
-        if (!el) return;
-        el.scrollTop = el.scrollHeight;
-    }, [entries, effectiveShowTodo]);
+    // 🔹 Todo를 끼워넣을 위치(마지막 /todo 메세지 인덱스)
+    const lastTodoIndex = useMemo(() => {
+        let idx = -1;
+        entries.forEach((e, i) => {
+            if (
+                e.type === "USER" &&
+                e.text.trim().toLowerCase() === "/todo"
+            ) {
+                idx = i;
+            }
+        });
+        return idx;
+    }, [entries]);
 
+    // ✅ 새 메시지나 Todo 표시 상태가 바뀔 때마다 맨 아래로 자동 스크롤
+    useEffect(() => {
+        if (!scrollContainerRef.current) return;
+        if (bottomRef.current) {
+            bottomRef.current.scrollIntoView({ block: "end" });
+        } else {
+            // 혹시 몰라서 fallback으로 scrollTop도 세팅
+            const el = scrollContainerRef.current;
+            el.scrollTop = el.scrollHeight;
+        }
+    }, [entries.length, effectiveShowTodo]);
 
     return (
         <div className="flex flex-col h-full">
             {/* 채팅 내역 */}
-            <main ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+            <main
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto px-4 py-4 space-y-2"
+            >
                 {entries.length === 0 && (
                     <div className="h-full flex items-center justify-center text-sm text-slate-500 text-center px-6">
                         예: <code className="text-sky-300">#미적분</code>{" "}
@@ -94,17 +117,16 @@ export default function ChatPanel({
                     </div>
                 )}
 
-                {entries.map((entry) => {
+                {entries.map((entry, index) => {
                     const isSystem = entry.type === "SYSTEM";
                     const color = getTaskColor(entry.taskName);
 
+                    let node: React.ReactNode;
+
                     // TASK_START 레이아웃
                     if (isSystem && entry.systemKind === "TASK_START") {
-                        return (
-                            <div
-                                key={entry.id}
-                                className="flex items-start gap-3 text-sm"
-                            >
+                        node = (
+                            <div className="flex items-start gap-3 text-sm">
                                 <div className="w-14 text-right text-[11px] text-slate-500 pt-1">
                                     {entry.time}
                                 </div>
@@ -131,14 +153,10 @@ export default function ChatPanel({
                             </div>
                         );
                     }
-
                     // TASK_END 레이아웃
-                    if (isSystem && entry.systemKind === "TASK_END") {
-                        return (
-                            <div
-                                key={entry.id}
-                                className="flex items-start gap-3 text-sm"
-                            >
+                    else if (isSystem && entry.systemKind === "TASK_END") {
+                        node = (
+                            <div className="flex items-start gap-3 text-sm">
                                 <div className="w-14 text-right text-[11px] text-slate-500 pt-1">
                                     {entry.time}
                                 </div>
@@ -168,7 +186,9 @@ export default function ChatPanel({
                                                 onClick={() => {
                                                     const url = `/docs?task=${encodeURIComponent(
                                                         entry.taskName!
-                                                    )}&date=${encodeURIComponent(currentDate)}`;
+                                                    )}&date=${encodeURIComponent(
+                                                        currentDate
+                                                    )}`;
                                                     window.location.href = url;
                                                 }}
                                             >
@@ -180,66 +200,79 @@ export default function ChatPanel({
                             </div>
                         );
                     }
-
                     // 일반 SYSTEM / USER 채팅
-                    return (
-                        <div
-                            key={entry.id}
-                            className="flex items-start gap-3 text-sm"
-                        >
-                            <div className="w-14 text-right text-[11px] text-slate-500 pt-1">
-                                {entry.time}
-                            </div>
-
-                            <div className="flex-1 flex items-start gap-2">
-                                <div
-                                    className={`inline-flex max-w-[90%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${isSystem
-                                        ? "text-slate-200 text-xs"
-                                        : "text-slate-50"
-                                        }`}
-                                    style={
-                                        color && !isSystem
-                                            ? {
-                                                backgroundColor: color,
-                                            }
-                                            : isSystem
-                                                ? {
-                                                    backgroundColor: "#1f2933",
-                                                }
-                                                : undefined
-                                    }
-                                >
-                                    {entry.text}
+                    else {
+                        node = (
+                            <div className="flex items-start gap-3 text-sm">
+                                <div className="w-14 text-right text-[11px] text-slate-500 pt-1">
+                                    {entry.time}
                                 </div>
 
-                                <div className="flex flex-col gap-1 mt-1">
-                                    <button
-                                        className="p-1 rounded-full hover:bg-slate-800 text-[10px] text-slate-400"
-                                        title="수정"
-                                        onClick={() => onEditEntry(entry)}
-                                    >
-                                        <FaPen />
-                                    </button>
-                                    <button
-                                        className="p-1 rounded-full hover:bg-slate-800 text-[10px] text-slate-400"
-                                        title="삭제"
-                                        onClick={() =>
-                                            onDeleteEntry(entry.id)
+                                <div className="flex-1 flex items-start gap-2">
+                                    <div
+                                        className={`inline-flex max-w-[90%] rounded-2xl px-3 py-2 whitespace-pre-wrap break-words ${
+                                            isSystem
+                                                ? "text-slate-200 text-xs"
+                                                : "text-slate-50"
+                                        }`}
+                                        style={
+                                            color && !isSystem
+                                                ? {
+                                                      backgroundColor: color,
+                                                  }
+                                                : isSystem
+                                                ? {
+                                                      backgroundColor:
+                                                          "#1f2933",
+                                                  }
+                                                : undefined
                                         }
                                     >
-                                        <FaTrash />
-                                    </button>
+                                        {entry.text}
+                                    </div>
+
+                                    <div className="flex flex-col gap-1 mt-1">
+                                        <button
+                                            className="p-1 rounded-full hover:bg-slate-800 text-[10px] text-slate-400"
+                                            title="수정"
+                                            onClick={() =>
+                                                onEditEntry(entry)
+                                            }
+                                        >
+                                            <FaPen />
+                                        </button>
+                                        <button
+                                            className="p-1 rounded-full hover:bg-slate-800 text-[10px] text-slate-400"
+                                            title="삭제"
+                                            onClick={() =>
+                                                onDeleteEntry(entry.id)
+                                            }
+                                        >
+                                            <FaTrash />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        );
+                    }
+
+                    return (
+                        <React.Fragment key={entry.id}>
+                            {node}
+
+                            {/* 🔥 마지막 /todo 바로 아래에 Todo 삽입 */}
+                            {effectiveShowTodo &&
+                                lastTodoIndex === index && (
+                                    <div className="mt-3">
+                                        <Todo date={currentDate} />
+                                    </div>
+                                )}
+                        </React.Fragment>
                     );
                 })}
-                {/* 🔥 여기서 Todo를 메시지처럼 끼워넣기 */}
-                {effectiveShowTodo && (
-                    <div className="mt-3">
-                        <Todo date={currentDate} />
-                    </div>
-                )}
+
+                {/* ✅ 항상 맨 아래를 가리키는 dummy 요소 */}
+                <div ref={bottomRef} />
             </main>
 
             {/* 입력 영역 */}
@@ -265,16 +298,20 @@ export default function ChatPanel({
                         isTodaySelected && (
                             <div className="mt-1 w-full rounded-md border border-slate-700 bg-slate-900 text-xs max-h-40 overflow-y-auto shadow-lg">
                                 {hashtagSuggestions.map((d, idx) => {
-                                    const selected = idx === hashtagSelectedIndex;
+                                    const selected =
+                                        idx === hashtagSelectedIndex;
                                     return (
                                         <button
                                             key={d.name}
                                             type="button"
-                                            onClick={() => onSelectHashtag(d.name)}
-                                            className={`w-full text-left px-2 py-1 flex items-center gap-2 ${selected
-                                                ? "bg-slate-800"
-                                                : "hover:bg-slate-800"
-                                                }`}
+                                            onClick={() =>
+                                                onSelectHashtag(d.name)
+                                            }
+                                            className={`w-full text-left px-2 py-1 flex items-center gap-2 ${
+                                                selected
+                                                    ? "bg-slate-800"
+                                                    : "hover:bg-slate-800"
+                                            }`}
                                         >
                                             <span
                                                 className="w-3 h-3 rounded-full"
@@ -304,16 +341,20 @@ export default function ChatPanel({
                                     type="button"
                                     className="w-full text-left px-2 py-1 hover:bg-slate-800 flex items-center gap-2"
                                     onClick={() =>
-                                        onChangeInput({ target: { value: "/Todo" } } as any)
+                                        onChangeInput({
+                                            target: { value: "/Todo" },
+                                        } as any)
                                     }
                                 >
-                                    <span className="text-sky-300">/Todo</span>
-                                    <span className="text-slate-400">오늘 Todo 보드 열기</span>
+                                    <span className="text-sky-300">
+                                        /Todo
+                                    </span>
+                                    <span className="text-slate-400">
+                                        오늘 Todo 보드 열기
+                                    </span>
                                 </button>
                             </div>
                         )}
-
-
 
                     {/* 아래쪽 상태 줄 */}
                     <div className="flex justify-between text-[11px] text-slate-500">

@@ -86,7 +86,7 @@ export default function TimelinePage() {
 
     /** ----- 렌더 ----- */
     return (
-        <div className="h-screen flex flex-col bg-slate-950 text-slate-50">
+        <div className="h-screen flex flex-col bg-slate-950 text-slate-50 overflow-hidden">
             {/* 상단 헤더 */}
             <TimelineHeader
                 currentDate={currentDate}
@@ -125,7 +125,7 @@ export default function TimelinePage() {
                         </div>
                     )}
                     {/* ✅ ChatPanel이 남은 세로 공간을 모두 쓰게 하고, 내부에서 스크롤 처리 */}
-                    <div className="flex-1 min-h-0 flex flex-col">
+                    <div className="flex-1 min-h-0 flex flex-col overflow-auto">
                         <div className="flex-1 min-h-0">
                             <div className="flex-1 min-h-0">
                                 <ChatPanel

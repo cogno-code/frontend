@@ -22,7 +22,6 @@ export default function TimelineHeader({
                     onClick={() => (window.location.href = "/")}
                 >
                     <FaHome className="text-slate-300" />
-                    <span>/Home</span>
                 </button>
 
                 <span className="text-sm font-semibold ml-2">

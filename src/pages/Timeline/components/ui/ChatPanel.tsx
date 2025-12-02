@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import type { KeyboardEvent } from "react";
 import { FaTrash, FaPen, FaCheck } from "react-icons/fa";
 import type { ChatEntry, TaskDefinition } from "../../timelineTypes";
@@ -56,10 +56,19 @@ export default function ChatPanel({
     currentDate,
     hashtagPrefix,
 }: ChatPanelProps) {
+    // ✅ 채팅 영역 스크롤 컨테이너 ref
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+
+    // ✅ entries가 바뀔 때마다 항상 맨 아래로 스크롤
+    useEffect(() => {
+        const el = scrollContainerRef.current;
+        if (!el) return;
+        el.scrollTop = el.scrollHeight;
+    }, [entries]);
     return (
         <div className="flex flex-col h-full">
             {/* 채팅 내역 */}
-            <main className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+            <main ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
                 {entries.length === 0 && (
                     <div className="h-full flex items-center justify-center text-sm text-slate-500 text-center px-6">
                         예: <code className="text-sky-300">#미적분</code>{" "}
@@ -239,8 +248,8 @@ export default function ChatPanel({
                                             type="button"
                                             onClick={() => onSelectHashtag(d.name)}
                                             className={`w-full text-left px-2 py-1 flex items-center gap-2 ${selected
-                                                    ? "bg-slate-800"
-                                                    : "hover:bg-slate-800"
+                                                ? "bg-slate-800"
+                                                : "hover:bg-slate-800"
                                                 }`}
                                         >
                                             <span

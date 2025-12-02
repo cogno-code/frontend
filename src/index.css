@@ -9,3 +9,29 @@ tailwindcss 설치
 4. main.tsx에서 index.css 불러오기
 
 */
+
+/* 모든 요소에 대한 기본 스크롤바 스타일 (Firefox) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b #020617; /* thumb, track */
+}
+
+/* Chrome / Edge / Safari 전용 */
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #020617; /* slate-950 느낌 */
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #1e293b;  /* slate-800 정도 */
+  border-radius: 9999px;
+  border: 2px solid #020617;  /* 트랙이랑 맞춰서 여백 느낌 */
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #334155;  /* hover 시 약간 더 밝게 */
+}

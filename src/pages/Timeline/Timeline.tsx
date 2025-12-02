@@ -4,14 +4,15 @@ import type {
 
 import { useTaskDefinitions } from "./hooks/useTaskDefinitions";
 import { ChatPanel, TimelineHeader, TimelinePanel, MonthlyPlanner, TaskCategoryModal } from "./components/form";
+import Todo from "../../components/Todo/Todo";
 import { useTimelineData } from "./hooks/useTimelineData";
 import { useChatInput } from "./hooks/useChatInput";
 import { useResizableTimeline } from "./hooks/useResizableTimeline";
 
 export default function TimelinePage() {
     const {
-    showTimeline, toggleTimeline, timelineWidthPct, chatWidthPct, containerRef, startResizing,
-  } = useResizableTimeline(40);
+        showTimeline, toggleTimeline, timelineWidthPct, chatWidthPct, containerRef, startResizing,
+    } = useResizableTimeline(40);
     const { taskDefs, showTaskModal, openTaskModal, closeTaskModal, newTaskName, setNewTaskName, newTaskColor, setNewTaskColor, addTaskDef } = useTaskDefinitions();
     const { entries, tasks, currentDate, activeTaskName, runningTasks, lastEndedTask, isTodaySelected,
         setCurrentDate, setActiveTaskName, setLastEndedTask,
@@ -130,6 +131,10 @@ export default function TimelinePage() {
                             {/* 아래쪽: 타임라인 패널 */}
                             <div className="flex-1">
                                 <TimelinePanel tasks={tasks} currentDate={currentDate} />
+                            </div>
+                            {/* 🔥 추가: Todo 패널 */}
+                            <div className="border-t border-slate-800 min-h-[250px] max-h-[40%] overflow-y-auto">
+                                <Todo date={currentDate} />
                             </div>
                         </div>
                     </>

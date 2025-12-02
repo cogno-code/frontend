@@ -7,6 +7,7 @@ import Study from "./Study";
 import Memo from "./pages/Memo/Memo";
 import TimelinePage from "./pages/Timeline/Timeline";
 import DocsPage from "./pages/Docs/Docs";
+import TestPage from "./TestPage";
 
 export default function App() {
   return (
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/memo" element={<Memo/>}/>
         <Route path="/timeline" element={<TimelinePage/>}/>
         <Route path="/docs" element={<DocsPage/>} />
+        <Route path="/test" element={<TestPage/>}/>
       </Routes>
     </BrowserRouter>
   );

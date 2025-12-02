@@ -101,7 +101,7 @@ function parseDroppableId(droppableId: string): number | null {
 export default function Todo({ date }: TodoProps) {
     const [items, setItems] = useState<TodoItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
+    const [, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
     // 🔹 TaskDefinition 리스트

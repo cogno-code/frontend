@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from "react";
+import React, { useEffect, useRef, useMemo, useCallback } from "react";
 import type { KeyboardEvent } from "react";
 import { FaTrash, FaPen, FaCheck } from "react-icons/fa";
 import type { ChatEntry, TaskDefinition } from "../../timelineTypes";
@@ -6,29 +6,35 @@ import Todo from "../../../../components/Todo/Todo";
 
 type ChatPanelProps = {
     entries: ChatEntry[];
+    /** taskName → color 반환하는 헬퍼 (부모에서 정의) */
     getTaskColor: (taskName?: string) => string | undefined;
 
+    /** 입력창 상태 & 핸들러 */
     input: string;
     onChangeInput: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
     onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
     textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 
+    /** 오늘 날짜인지 여부 (이전 날짜면 입력 비활성화) */
     isTodaySelected: boolean;
 
+    /** 현재 입력에 사용 중인 task / 진행 중 task 리스트 표시용 */
     activeTaskName?: string;
     runningTaskNames: string[];
 
+    /** 해시태그 자동완성 관련 */
     hashtagSuggestions: TaskDefinition[];
     hashtagQuery: string | null;
     hashtagSelectedIndex: number;
     onSelectHashtag: (name: string) => void;
 
+    /** 채팅 수정/삭제 콜백 */
     onEditEntry: (entry: ChatEntry) => void;
     onDeleteEntry: (id: number) => void;
 
     currentDate: string;
 
-    hashtagPrefix: "#" | "##";
+    hashtagPrefix: "#" | "##"; // ✅ 추가
     showTodoInline?: boolean;
 };
 
@@ -52,8 +58,10 @@ export default function ChatPanel({
     hashtagPrefix,
     showTodoInline,
 }: ChatPanelProps) {
-    // ✅ 채팅 영역 스크롤 컨테이너 ref (실제 스크롤은 여기서만)
+    // ✅ 채팅 영역 스크롤 컨테이너 ref (overflow-y-auto 걸린 곳)
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    // ✅ 항상 맨 아래에 있는 더미 요소 ref
+    const bottomRef = useRef<HTMLDivElement | null>(null);
 
     // 🔹 "/todo" 채팅이 있는지 확인
     const hasTodoCommand = useMemo(
@@ -83,12 +91,28 @@ export default function ChatPanel({
         return idx;
     }, [entries]);
 
-    // ✅ 새 메시지나 Todo 표시 상태가 바뀔 때마다 "컨테이너"를 맨 아래로 스크롤
+    // ✅ 공통 스크롤 함수: 항상 bottomRef가 보이게
+    const scrollToBottom = useCallback(() => {
+        if (!bottomRef.current) return;
+        bottomRef.current.scrollIntoView({
+            behavior: "auto",
+            block: "end",
+        });
+    }, []);
+
+    // ✅ 1) 처음 마운트될 때 한 번 강제로 맨 아래로 (초기 렌더 문제 방지)
     useEffect(() => {
-        const el = scrollContainerRef.current;
-        if (!el) return;
-        el.scrollTop = el.scrollHeight;
-    }, [entries.length, effectiveShowTodo]);
+        // 레이아웃이 어느 정도 잡힌 뒤에 실행
+        const id = requestAnimationFrame(() => {
+            scrollToBottom();
+        });
+        return () => cancelAnimationFrame(id);
+    }, [scrollToBottom]);
+
+    // ✅ 2) entries / Todo 표시 상태 변경될 때마다 다시 맨 아래로
+    useEffect(() => {
+        scrollToBottom();
+    }, [entries.length, effectiveShowTodo, scrollToBottom]);
 
     return (
         <div className="flex flex-col h-full">
@@ -257,6 +281,9 @@ export default function ChatPanel({
                         </React.Fragment>
                     );
                 })}
+
+                {/* ✅ 항상 맨 아래에 위치하는 더미 요소: 여기까지 보이도록 스크롤 */}
+                <div ref={bottomRef} />
             </main>
 
             {/* 입력 영역 (항상 왼쪽 컬럼의 맨 아래에 고정) */}
@@ -315,7 +342,7 @@ export default function ChatPanel({
 
                     {/* /Todo 커맨드 자동완성 */}
                     {isTodaySelected &&
-                        hashtagQuery === null &&
+                        hashtagQuery === null && // 해시태그 모드 아닐 때만
                         input.trim().startsWith("/") &&
                         "/todo".startsWith(input.trim().toLowerCase()) &&
                         input.trim().length > 0 && (

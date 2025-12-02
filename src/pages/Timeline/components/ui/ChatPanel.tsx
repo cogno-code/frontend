@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useMemo } from "react";
 import type { KeyboardEvent } from "react";
 import { FaTrash, FaPen, FaCheck } from "react-icons/fa";
 import type { ChatEntry, TaskDefinition } from "../../timelineTypes";
@@ -62,11 +62,26 @@ export default function ChatPanel({
     // ✅ 채팅 영역 스크롤 컨테이너 ref
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
+    // 🔹 "/Todo" 채팅이 있는지 확인
+    const hasTodoCommand = useMemo(
+        () =>
+            entries.some(
+                (e) =>
+                    e.type === "USER" &&
+                    e.text.trim().toLowerCase() === "/todo"
+            ),
+        [entries]
+    );
+
+    // 🔹 최종적으로 Todo를 보여줄지 여부
+    const effectiveShowTodo = showTodoInline || hasTodoCommand;
+
     useEffect(() => {
         const el = scrollContainerRef.current;
         if (!el) return;
         el.scrollTop = el.scrollHeight;
-    }, [entries, showTodoInline]);
+    }, [entries, effectiveShowTodo]);
+
 
     return (
         <div className="flex flex-col h-full">
@@ -220,7 +235,7 @@ export default function ChatPanel({
                     );
                 })}
                 {/* 🔥 여기서 Todo를 메시지처럼 끼워넣기 */}
-                {showTodoInline && (
+                {effectiveShowTodo && (
                     <div className="mt-3">
                         <Todo date={currentDate} />
                     </div>

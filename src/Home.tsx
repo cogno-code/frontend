@@ -1,5 +1,6 @@
 // src/HomePage.tsx
 import KakaoLoginButton from "./components/KakaoLoginButton";
+import Todo from "./components/Todo/Todo";
 import { useAuth } from "./hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 
@@ -10,6 +11,7 @@ export default function HomePage() {
     const API_BASE = import.meta.env.VITE_API_URL;
     const LOGOUT_URL = `${API_BASE}/logout`;
 
+    const today = new Date().toISOString().slice(0, 10);
 
 
     // 1) 로딩 상태
@@ -127,20 +129,7 @@ export default function HomePage() {
 
                     {/* 카드 4: 타임라인 카드 (한 번 더 강조) */}
                     <div className="col-span-1 md:col-span-3 rounded-xl border border-slate-800 bg-slate-900/80 p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                        <div>
-                            <h3 className="text-sm font-semibold text-slate-100">
-                                타임라인으로 바로 가기
-                            </h3>
-                            <p className="mt-1 text-xs text-slate-400">
-                                TASK START / END, 채팅 로그, 하루의 기록을 한 화면에서 관리합니다.
-                            </p>
-                        </div>
-                        <button
-                            onClick={() => navigate("/timeline")}
-                            className="inline-flex items-center justify-center rounded-full px-4 py-2 text-xs font-medium bg-slate-100 text-slate-900 hover:bg-white transition-colors"
-                        >
-                            타임라인 열기
-                        </button>
+                        <Todo date={today}/>
                     </div>
                 </section>
             </main>

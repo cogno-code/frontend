@@ -50,29 +50,19 @@ export default function TimelinePage() {
             }
         }
 
-        // 🔹 2) /Todo 입력 시, 채팅 대신 Todo 컴포넌트 띄우기
+        // 🔹 2) Enter 입력 시 /Todo면 Todo 패널도 켜주기
         if (e.key === "Enter" && !e.shiftKey) {
-            if (trimmed === "/Todo") {
-                e.preventDefault();
-
-                // 채팅 리스트 안에 Todo 보이게
-                setShowTodoInline(true);   // ✅ 여기!
-
-                // 입력창 비우기
-                const fakeEvent = {
-                    target: { value: "" },
-                } as any;
-                handleInputChange(fakeEvent);
-
-                return;
+            if (trimmed.toLowerCase() === "/todo") {
+                // ❗ 여기서는 e.preventDefault()나 return 하지 않고,
+                // 그냥 Todo 패널만 켜주고 나머지는 baseHandleKeyDown에 맡긴다.
+                setShowTodoInline(true);
+                // 여기서 리턴하지 말고 밑으로 흘려보냄
             }
         }
 
-        // 나머지는 원래 로직
+        // 나머지는 원래 useChatInput 로직에 위임 (여기서 addChat 호출됨)
         baseHandleKeyDown(e);
     };
-
-
 
 
     /** ----- 채팅 수정 ----- */

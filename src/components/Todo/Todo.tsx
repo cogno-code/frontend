@@ -1,14 +1,14 @@
 // app/components/Todo/Todo.tsx
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import axios from "axios";
+import { useTodo } from "./hooks/useTodo";
+import type { TodoStatus } from "./hooks/useTodo";
 import {
     DragDropContext,
     Droppable,
     Draggable,
 } from "@hello-pangea/dnd";
-import type { DropResult } from "@hello-pangea/dnd";
+
 import {
     FaCheck,
     FaChevronRight,
@@ -18,23 +18,6 @@ import {
     FaPen,
     FaBan,
 } from "react-icons/fa";
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
-
-// 🔹 백엔드 enum TodoStatus 에 맞춘 대문자 상태값
-export type TodoStatus =
-    | "TODO"
-    | "DONE"
-    | "MIGRATED"
-    | "SCHEDULED"
-    | "CANCELED";
-
-// 🔹 서버의 TaskDefinition
-interface TaskDefinition {
-    id: number;
-    name: string;
-    color: string;
-}
 
 interface TodoItem {
     id: string;          // 프론트 임시 ID
@@ -49,197 +32,31 @@ interface TodoProps {
     date: string; // YYYY-MM-DD
 }
 
-// 서버 응답 DTO들
-interface ServerTodoItem {
-    id: number;
-    text: string;
-    status: TodoStatus;
-    taskDefinitionId?: number | null;
-    order?: number | null;
-}
-
-interface ServerTodoResponse {
-    date: string;
-    items: ServerTodoItem[];
-}
-
-interface SaveTodosRequest {
-    date: string;
-    items: {
-        id?: number;
-        text: string;
-        status: TodoStatus;
-        taskDefinitionId?: number | null;
-        order?: number;
-    }[];
-}
-
-// 유틸: 빈 Todo 슬롯 생성
-function createEmptyItem(index: number): TodoItem {
-    return {
-        id: `tmp-${Date.now()}-${index}`,
-        text: "",
-        status: "TODO",
-        taskDefId: null,
-        order: index,
-    };
-}
-
 // droppableId ↔ taskDefId 변환
 function makeDroppableId(taskDefId: number | null): string {
     return taskDefId == null ? "none" : `def-${taskDefId}`;
 }
-function parseDroppableId(droppableId: string): number | null {
-    if (droppableId === "none") return null;
-    if (droppableId.startsWith("def-")) {
-        const n = Number(droppableId.slice(4));
-        return Number.isNaN(n) ? null : n;
-    }
-    return null;
-}
+
 
 export default function Todo({ date }: TodoProps) {
-    const [items, setItems] = useState<TodoItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [, setSaving] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
+    const {
+        items,
+        loading,
+        taskDefs,
+        taskDefsLoading,
+        editingId,
+        grouped,
 
-    // 🔹 TaskDefinition 리스트
-    const [taskDefs, setTaskDefs] = useState<TaskDefinition[]>([]);
-    const [taskDefsLoading, setTaskDefsLoading] = useState(true);
+        handleChangeText,
+        toggleEdit,
+        deleteItem,
+        addItem,
+        toggleStatus,
+        changeTaskDef,
+        finishEditing,
+        onDragEnd,
+    } = useTodo(date);
 
-    // --- TaskDefinition 로드 ---
-    useEffect(() => {
-        let cancelled = false;
-        (async () => {
-            setTaskDefsLoading(true);
-            try {
-                const res = await axios.get<TaskDefinition[]>(
-                    `${API_BASE}/api/timeline/task-definitions`,
-                    { withCredentials: true }
-                );
-                if (cancelled) return;
-                setTaskDefs(res.data ?? []);
-            } catch (e) {
-                console.error("load task definitions failed", e);
-                if (!cancelled) setTaskDefs([]);
-            } finally {
-                if (!cancelled) setTaskDefsLoading(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    // --- 서버에 전체 저장 ---
-    const saveAll = useCallback(
-        async (nextItems: TodoItem[]) => {
-            try {
-                setSaving(true);
-
-                const payload: SaveTodosRequest = {
-                    date,
-                    items: nextItems.map((it, idx) => ({
-                        id: it.serverId,
-                        text: it.text,
-                        status: it.status ?? "TODO",
-                        taskDefinitionId: it.taskDefId ?? null,
-                        order: it.order ?? idx,
-                    })),
-                };
-
-                await axios.put(`${API_BASE}/api/todo`, payload, {
-                    withCredentials: true,
-                });
-            } catch (e) {
-                console.error("save todos failed", e);
-            } finally {
-                setSaving(false);
-            }
-        },
-        [date]
-    );
-
-    // --- 최초 / 날짜 변경 시 Todo 로드 ---
-    useEffect(() => {
-        let cancelled = false;
-
-        (async () => {
-            setLoading(true);
-            try {
-                const res = await axios.get<ServerTodoResponse>(
-                    `${API_BASE}/api/todo`,
-                    {
-                        params: { date },
-                        withCredentials: true,
-                    }
-                );
-                if (cancelled) return;
-
-                const fromServer = res.data?.items ?? [];
-
-                if (fromServer.length === 0) {
-                    const base = Array.from({ length: 5 }, (_, i) =>
-                        createEmptyItem(i)
-                    );
-                    setItems(base);
-                    saveAll(base);
-                } else {
-                    const mapped: TodoItem[] = fromServer.map((s, idx) => ({
-                        id: `srv-${s.id}`,
-                        serverId: s.id,
-                        text: s.text ?? "",
-                        status: s.status ?? "TODO",
-                        taskDefId:
-                            s.taskDefinitionId !== undefined
-                                ? s.taskDefinitionId
-                                : null,
-                        order: s.order ?? idx,
-                    }));
-                    setItems(mapped);
-                }
-            } catch (e) {
-                console.error("load todos failed", e);
-                const base = Array.from({ length: 5 }, (_, i) =>
-                    createEmptyItem(i)
-                );
-                setItems(base);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [date, saveAll]);
-
-    // --- TaskDefinition 기준 그룹핑 ---
-    const grouped = (() => {
-        // id -> 배열
-        const byDefId: Record<number, TodoItem[]> = {};
-        for (const def of taskDefs) {
-            byDefId[def.id] = [];
-        }
-        const uncategorized: TodoItem[] = [];
-
-        for (const it of items) {
-            if (it.taskDefId != null && byDefId[it.taskDefId]) {
-                byDefId[it.taskDefId].push(it);
-            } else {
-                uncategorized.push(it);
-            }
-        }
-
-        // order 정렬
-        Object.values(byDefId).forEach((arr) =>
-            arr.sort((a, b) => a.order - b.order)
-        );
-        uncategorized.sort((a, b) => a.order - b.order);
-
-        return { byDefId, uncategorized };
-    })();
 
     // 섹션 순서: TaskDefinition들 + Uncategorized
     const sections: {
@@ -307,178 +124,8 @@ export default function Todo({ date }: TodoProps) {
         }
     };
 
-    // --- 변경 핸들러들 ---
 
-    const handleChangeText = (id: string, text: string) => {
-        setItems((prev) =>
-            prev.map((it) => (it.id === id ? { ...it, text } : it))
-        );
-    };
 
-    const toggleStatus = (id: string, target: TodoStatus) => {
-        setItems((prev) => {
-            const next = prev.map((it) => {
-                if (it.id !== id) return it;
-                const nextStatus = it.status === target ? "TODO" : target;
-                return { ...it, status: nextStatus };
-            });
-            saveAll(next);
-            return next;
-        });
-    };
-
-    const changeTaskDef = (id: string, taskDefId: number | null) => {
-        setItems((prev) => {
-            const sameGroup = prev.filter(
-                (it) =>
-                    (it.taskDefId ?? null) === taskDefId && it.id !== id
-            );
-            const newOrder = sameGroup.length;
-
-            const next = prev.map((it) =>
-                it.id === id
-                    ? { ...it, taskDefId, order: newOrder }
-                    : it
-            );
-            saveAll(next);
-            return next;
-        });
-    };
-
-    const deleteItem = (id: string) => {
-        setItems((prev) => {
-            const next = prev.filter((it) => it.id !== id);
-            saveAll(next);
-            return next;
-        });
-        if (editingId === id) setEditingId(null);
-    };
-
-    const addItem = () => {
-        setItems((prev) => {
-            const next = [...prev, createEmptyItem(prev.length)];
-            saveAll(next);
-            return next;
-        });
-    };
-
-    const finishEditing = () => {
-        setEditingId(null);
-        // 마지막 입력까지 반영된 현재 items를 저장
-        saveAll(items);
-    };
-
-    const toggleEdit = (id: string) => {
-        setEditingId((prev) => {
-            if (prev === id) {
-                // 수정 모드 → 일반 모드로 나갈 때
-                saveAll(items);
-                return null;
-            }
-            // 다른 아이템으로 수정모드 진입
-            return id;
-        });
-    };
-    // --- Drag & Drop ---
-    const onDragEnd = (result: DropResult) => {
-        const { destination, source } = result;
-        if (!destination) return;
-
-        const sourceTaskDefId = parseDroppableId(source.droppableId);
-        const destTaskDefId = parseDroppableId(destination.droppableId);
-
-        if (
-            sourceTaskDefId === destTaskDefId &&
-            destination.index === source.index
-        ) {
-            return;
-        }
-
-        setItems((prev) => {
-            // 같은 그룹 내 이동
-            if (sourceTaskDefId === destTaskDefId) {
-                const sameGroup = prev
-                    .filter(
-                        (it) => (it.taskDefId ?? null) === sourceTaskDefId
-                    )
-                    .sort((a, b) => a.order - b.order);
-
-                const [moved] = sameGroup.splice(source.index, 1);
-                sameGroup.splice(destination.index, 0, moved);
-
-                const updated = sameGroup.map((it, idx) => ({
-                    ...it,
-                    order: idx,
-                }));
-
-                const next = prev.map((it) =>
-                    (it.taskDefId ?? null) === sourceTaskDefId
-                        ? updated.find((u) => u.id === it.id) ?? it
-                        : it
-                );
-                saveAll(next);
-                return next;
-            }
-
-            // 다른 그룹으로 이동
-            const sourceItems = prev
-                .filter(
-                    (it) => (it.taskDefId ?? null) === sourceTaskDefId
-                )
-                .sort((a, b) => a.order - b.order);
-
-            const destItems = prev
-                .filter((it) => (it.taskDefId ?? null) === destTaskDefId)
-                .sort((a, b) => a.order - b.order);
-
-            const [moved] = sourceItems.splice(source.index, 1);
-
-            if (!moved) {
-                return prev;
-            }
-
-            const movedId = moved.id;
-
-            destItems.splice(destination.index, 0, {
-                ...moved,
-                taskDefId: destTaskDefId,
-            });
-
-            const updatedSource = sourceItems.map((it, idx) => ({
-                ...it,
-                order: idx,
-            }));
-            const updatedDest = destItems.map((it, idx) => ({
-                ...it,
-                order: idx,
-            }));
-
-            const next = prev.map((it) => {
-                const key = it.taskDefId ?? null;
-
-                // 🔥 이동한 아이템은 dest 그룹 기준으로 강제 업데이트
-                if (it.id === movedId) {
-                    return (
-                        updatedDest.find((u) => u.id === movedId) ?? {
-                            ...it,
-                            taskDefId: destTaskDefId,
-                        }
-                    );
-                }
-
-                if (key === sourceTaskDefId) {
-                    return updatedSource.find((u) => u.id === it.id) ?? it;
-                }
-                if (key === destTaskDefId) {
-                    return updatedDest.find((u) => u.id === it.id) ?? it;
-                }
-                return it;
-            });
-
-            saveAll(next);
-            return next;
-        });
-    };
 
     if (loading || taskDefsLoading) {
         return (

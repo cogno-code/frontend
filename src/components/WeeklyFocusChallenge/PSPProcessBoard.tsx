@@ -8,17 +8,34 @@ import WeeklyTodo from "./WeeklyTodo";
 
 const API_BASE = import.meta.env.VITE_API_URL ?? "";
 
-type ChallengeDetail = {
-  psp: {
-    stage: "ISSUE" | "CAUSE" | "IDEA" | "PLAN";
-    content: string;
-  }[];
-  review?: {
-    reviewText: string;
-  };
+type PSPItem = {
+  id: number;
+  challengeId: number;
+  stage: "ISSUE" | "CAUSE" | "IDEA" | "PLAN";
+  content: string;
 };
 
-export default function PSPProcessBoard({ challengeId, startDate }: { challengeId: number, startDate: string }) {
+type ChallengeDetailRaw = {
+  challenge: {
+    id: number;
+    mainGoal: string;
+    startDate: string;
+    endDate: string;
+    finished: boolean;
+  };
+  pspList: PSPItem[];
+  review: {
+    reviewText: string;
+  } | null;
+};
+
+export default function PSPProcessBoard({
+  challengeId,
+  startDate,
+}: {
+  challengeId: number;
+  startDate: string;
+}) {
   const [completed, setCompleted] = useState({
     issue: false,
     cause: false,
@@ -27,36 +44,60 @@ export default function PSPProcessBoard({ challengeId, startDate }: { challengeI
     execution: false,
   });
 
-  const [initialData, setInitialData] = useState<ChallengeDetail | null>(null);
+  const [pspMap, setPspMap] = useState<Record<string, string[]>>({
+    ISSUE: [],
+    CAUSE: [],
+    IDEA: [],
+    PLAN: [],
+  });
+
+  const [review, setReview] = useState("");
 
   /* =========================
-     ✅ 상세 조회
-     GET /api/challenge/{id}
+     ✅ 상세 조회 (구조 정확히 맞춤)
   ========================= */
   useEffect(() => {
     (async () => {
       try {
-        const res = await axios.get(
+        const res = await axios.get<ChallengeDetailRaw>(
           `${API_BASE}/api/challenge/${challengeId}`,
           { withCredentials: true }
         );
 
-        console.log("✅ challenge detail:", res.data);
-        setInitialData(res.data);
+        console.log("✅ challenge detail RAW:", res.data);
+
+        const map: Record<string, string[]> = {
+          ISSUE: [],
+          CAUSE: [],
+          IDEA: [],
+          PLAN: [],
+        };
+
+        // ✅ 같은 stage 여러 개 있으면 "가장 마지막 것"만 사용
+        res.data.pspList.forEach((p) => {
+          map[p.stage] = p.content.split("\n");
+        });
+
+        setPspMap(map);
 
         setCompleted({
-          issue: res.data.psp?.some((p: any) => p.stage === "ISSUE"),
-          cause: res.data.psp?.some((p: any) => p.stage === "CAUSE"),
-          idea: res.data.psp?.some((p: any) => p.stage === "IDEA"),
-          plan: res.data.psp?.some((p: any) => p.stage === "PLAN"),
+          issue: map.ISSUE.length > 0,
+          cause: map.CAUSE.length > 0,
+          idea: map.IDEA.length > 0,
+          plan: map.PLAN.length > 0,
           execution: Boolean(res.data.review),
         });
+
+        setReview(res.data.review?.reviewText ?? "");
       } catch (e) {
         console.warn("❌ challenge detail 불러오기 실패", e);
       }
     })();
   }, [challengeId]);
 
+  /* =========================
+     ✅ 저장 API
+  ========================= */
   const savePsp = async (stage: string, rows: string[]) => {
     const content = rows.join("\n");
 
@@ -82,72 +123,61 @@ export default function PSPProcessBoard({ challengeId, startDate }: { challengeI
 
   return (
     <div className="space-y-8">
-
+      {/* 1️⃣ ISSUE */}
       <PSPStageCard
         title="1. Issue Framing"
+        defaultRows={pspMap.ISSUE}
         onSave={(rows) => {
           savePsp("ISSUE", rows);
           setCompleted((p) => ({ ...p, issue: true }));
         }}
-        defaultRows={
-          initialData?.psp
-            ?.find((p) => p.stage === "ISSUE")
-            ?.content.split("\n") ?? []
-        }
       />
       <FlowArrow active={completed.issue} />
 
+      {/* 2️⃣ CAUSE */}
       <PSPStageCard
         title="2. Root Cause"
+        defaultRows={pspMap.CAUSE}
         onSave={(rows) => {
           savePsp("CAUSE", rows);
           setCompleted((p) => ({ ...p, cause: true }));
         }}
-        defaultRows={
-          initialData?.psp
-            ?.find((p) => p.stage === "CAUSE")
-            ?.content.split("\n") ?? []
-        }
       />
       <FlowArrow active={completed.cause} />
 
+      {/* 3️⃣ IDEA */}
       <PSPStageCard
         title="3. Brainstorm"
+        defaultRows={pspMap.IDEA}
         onSave={(rows) => {
           savePsp("IDEA", rows);
           setCompleted((p) => ({ ...p, idea: true }));
         }}
-        defaultRows={
-          initialData?.psp
-            ?.find((p) => p.stage === "IDEA")
-            ?.content.split("\n") ?? []
-        }
       />
       <FlowArrow active={completed.idea} />
 
+      {/* 4️⃣ PLAN */}
       <PSPStageCard
         title="4. Planning"
+        defaultRows={pspMap.PLAN}
         onSave={(rows) => {
           savePsp("PLAN", rows);
           setCompleted((p) => ({ ...p, plan: true }));
         }}
-        defaultRows={
-          initialData?.psp
-            ?.find((p) => p.stage === "PLAN")
-            ?.content.split("\n") ?? []
-        }
       />
       <FlowArrow active={completed.plan} />
 
+      {/* 5️⃣ TODO */}
       <WeeklyTodo startDate={startDate} />
-
       <FlowArrow active={completed.execution} />
 
+      {/* 6️⃣ REVIEW */}
       <div className="w-full rounded-lg border border-slate-700 bg-slate-900 p-4 shadow-md">
         <textarea
-          defaultValue={initialData?.review?.reviewText ?? ""}
-          onBlur={(e) => {
-            saveReview(e.target.value);
+          value={review}
+          onChange={(e) => setReview(e.target.value)}
+          onBlur={() => {
+            saveReview(review);
             setCompleted((p) => ({ ...p, execution: true }));
           }}
           className="w-full min-h-[140px] bg-slate-950 border border-slate-700 rounded-md p-3 text-sm text-slate-100 resize-none"

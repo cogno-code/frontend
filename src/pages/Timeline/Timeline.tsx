@@ -34,35 +34,46 @@ export default function TimelinePage() {
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
         const rawValue = textareaRef.current?.value ?? "";
-        const trimmed = rawValue.trim();
+        const trimmed = rawValue.trim().toLowerCase();
 
-        // 🔹 1) /Todo 자동완성 (Tab)
+        // ✅ 자동완성 대상 커맨드 목록
+        const COMMANDS = ["/todo", "/weeklyfocuschallenge"];
+
+        // 🔹 1) Tab 자동완성
         if (e.key === "Tab") {
-            const lower = trimmed.toLowerCase();
-            const target = "/todo";
-            if (target.startsWith(lower) && lower.length > 0) {
+            const matched = COMMANDS.find((cmd) =>
+                cmd.startsWith(trimmed)
+            );
+
+            if (matched && trimmed.length > 0) {
                 e.preventDefault();
+
                 const fakeEvent = {
-                    target: { value: "/Todo" },
+                    target: { value: matched },
                 } as any;
+
                 handleInputChange(fakeEvent);
                 return;
             }
         }
 
-        // 🔹 2) Enter 입력 시 /Todo면 Todo 패널도 켜주기
+        // 🔹 2) Enter 입력 시 /Todo → Todo 패널 열기
         if (e.key === "Enter" && !e.shiftKey) {
-            if (trimmed.toLowerCase() === "/todo") {
-                // ❗ 여기서는 e.preventDefault()나 return 하지 않고,
-                // 그냥 Todo 패널만 켜주고 나머지는 baseHandleKeyDown에 맡긴다.
+            if (trimmed === "/todo") {
                 setShowTodoInline(true);
-                // 여기서 리턴하지 말고 밑으로 흘려보냄
+                // return 하지 않고 아래로 흘려보냄
+            }
+
+            // ✅ Weekly Focus Challenge 진입 트리거
+            if (trimmed === "/weeklyfocuschallenge") {
+                window.location.href = "/weekly"; // ✅ 네 라우트에 맞게 조정
             }
         }
 
-        // 나머지는 원래 useChatInput 로직에 위임 (여기서 addChat 호출됨)
+        // 나머지는 기존 로직으로 위임
         baseHandleKeyDown(e);
     };
+
 
 
     /** ----- 채팅 수정 ----- */

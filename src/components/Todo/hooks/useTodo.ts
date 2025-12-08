@@ -372,6 +372,33 @@ export function useTodo(date: string) {
         saveAll(items);
     };
 
+    /* =========================
+   ✅ PSP 5단계에서 쓸 파생 상태들
+========================= */
+
+    // ✅ 실행 항목이 하나라도 존재하는가?
+    const hasExecution = items.some((it) => it.text.trim().length > 0);
+
+    // ✅ 실제 완료된 항목이 하나라도 있는가?
+    const hasDone = items.some((it) => it.status === "DONE");
+
+    // ✅ 전체 실행 개수
+    const totalCount = items.filter(
+        (it) => it.text.trim().length > 0
+    ).length;
+
+    // ✅ 완료된 실행 개수
+    const doneCount = items.filter(
+        (it) => it.status === "DONE"
+    ).length;
+
+    // ✅ 실행 진행률 (0~1)
+    const executionProgress =
+        totalCount === 0 ? 0 : doneCount / totalCount;
+
+    // ✅ 오늘 실제로 Todo를 “만지고 있는 상태”인지 여부
+    const isExecutingNow = editingId !== null;
+
 
     return {
         items,
@@ -389,6 +416,14 @@ export function useTodo(date: string) {
         changeTaskDef,
         finishEditing,
         onDragEnd,
+
+        /* ===== ✅ PSP 5단계 전용 ===== */
+        hasExecution,        // ✅ 5단계가 시작됐는지
+        hasDone,             // ✅ 완료가 하나라도 있는지
+        totalCount,          // ✅ 전체 실행 수
+        doneCount,           // ✅ 완료 수
+        executionProgress,  // ✅ 진행률 (0~1)
+        isExecutingNow,     // ✅ 지금 실행 중인지
     };
 
 }

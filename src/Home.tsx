@@ -120,11 +120,14 @@ export default function HomePage() {
                     {/* 카드 3: 더미 - 최근 메모 */}
                     <div className="rounded-xl border border-slate-800 bg-slate-900/80 p-4">
                         <h3 className="text-sm font-semibold text-slate-100">
-                            최근 메모 (더미)
+                            Test Page
                         </h3>
-                        <p className="mt-2 text-xs text-slate-400">
-                            타임라인에서 기록한 메모 일부를 여기에 요약해서 보여줄 예정이에요.
-                        </p>
+                        <button
+                            onClick={() => navigate("/test")}
+                            className="mt-4 inline-flex items-center justify-center rounded-full px-4 py-2 text-xs font-medium bg-sky-500 text-white hover:bg-sky-400 transition-colors"
+                        >
+                            Test Page
+                        </button>
                     </div>
 
                     {/* 카드 4: 타임라인 카드 (한 번 더 강조) */}

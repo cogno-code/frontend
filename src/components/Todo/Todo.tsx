@@ -40,7 +40,6 @@ function makeDroppableId(taskDefId: number | null): string {
 
 export default function Todo({ date }: TodoProps) {
     const {
-        items,
         loading,
         taskDefs,
         taskDefsLoading,
